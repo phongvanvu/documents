@@ -1,0 +1,445 @@
+.search-container {
+	display: flex;
+	align-items: center;
+}
+.search-container input {
+	flex: 1;
+}
+
+/* CSS tùy chỉnh để đảm bảo cột đồng nhất */
+.table th, .table td {
+	vertical-align: middle; /* Canh giữa theo chiều dọc */
+}
+
+/* CSS tùy chỉnh để thay đổi màu nền tiêu đề bảng */
+.table thead th {
+	background-color: #ff0000; /* Màu đỏ cho tiêu đề bảng */
+	color: white; /* Màu chữ trắng để dễ đọc */
+}
+
+.file-icon {
+	font-size: 1.5em;
+	vertical-align: middle;
+}
+
+.file-name {
+	display: inline-block;
+	margin-left: 10px;
+	vertical-align: middle;
+}
+
+.image-red {
+	width: 100%; /* Kích thước ảnh */
+	filter: hue-rotate(180deg) saturate(200%);
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* Viền bao quanh button group */
+.btn-group {
+    border: 1px solid #ddd; /* Thay đổi màu viền nếu cần */
+    border-radius: 5px; /* Bo góc viền nếu muốn */
+    overflow: hidden; /* Đảm bảo viền không bị cắt bớt */
+	width: 100%; /* Đảm bảo group chiếm toàn bộ chiều rộng của container */
+	justify-content: flex-end;
+}
+
+/* Tạo khoảng cách giữa các nút */
+.btn-group .btn {
+    border-radius: 0; /* Loại bỏ bo góc của các nút để viền của group không bị chia cắt */
+    border: none; /* Loại bỏ viền mặc định của các nút */
+    margin: 0; /* Đảm bảo không có khoảng cách giữa các nút */
+	width: 100%; /* Đảm bảo các nút chiếm toàn bộ chiều rộng của nhóm */
+}
+
+/* Tạo viền cho các nút nếu muốn */
+.btn-group .btn-primary {
+    border: 1px solid #007bff; /* Màu viền của nút primary */
+}
+
+.justify-content {
+    text-align: justify;
+}
+
+/* Phần này dùng viết lại giao diện nhé, sẽ sửa dần */
+/* Reset CSS cơ bản */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+:root {
+	--blue: #4e73df;
+	--indigo: #6610f2;
+	--purple: #6f42c1;
+	--pink: #e83e8c;
+	--red: #e74a3b;
+	--orange: #fd7e14;
+	--yellow: #f6c23e;
+	--green: #1cc88a;
+	--teal: #20c9a6;
+	--cyan: #36b9cc;
+	--white: #fff;
+	--gray: #858796;
+	--gray-dark: #5a5c69;
+	--primary: #4e73df;
+	--secondary: #858796;
+	--success: #1cc88a;
+	--info: #36b9cc;
+	--warning: #f6c23e;
+	--danger: #e74a3b;
+	--light: #f8f9fc;
+	--dark: #5a5c69;
+	--breakpoint-xs: 0;
+	--breakpoint-sm: 576px;
+	--breakpoint-md: 768px;
+	--breakpoint-lg: 992px;
+	--breakpoint-xl: 1200px;
+	--font-family-sans-serif: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+	--font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+html, body {
+	background-color: #ffcccc; /* Màu nền đỏ nhạt */
+	font-size: 14px;
+	height: 100%;
+	margin: 0;
+	display: flex;
+    flex-direction: column;
+	border-radius: 20px;
+	padding: 0;
+	overflow: auto;
+}
+.btn-primary {
+	background-color: #c82333;
+	border-color: #bd2130;
+	border-radius: 50px;
+}
+.btn-primary:hover {
+	background-color: #a71d2a;
+	border-color: #a71d2a;
+}
+.form-control {
+	border: 1px solid #c82333;
+	border-radius: 25px;
+}
+.form-control:focus {
+	border: 3px solid #a71d2a;
+	box-shadow: none;
+}
+h3 {
+	color: #c82333;
+	font-size: 18px;
+}
+/* Footer */
+footer {
+	background-color: #fa9f9f;
+    color: rgb(49, 49, 49); /* Màu chữ đen */
+    text-align: center; /* Căn giữa nội dung */
+    padding: 15px 0; /* Khoảng cách trên và dưới của footer */
+	width: 100%;
+	margin-bottom: 0;
+	bottom: 0;
+}
+footer a {
+    color: #fff; /* Màu liên kết trắng */
+    text-decoration: none; /* Loại bỏ gạch chân liên kết */
+}
+footer a:hover {
+    color: #f8d7da; /* Màu chữ khi hover */
+    text-decoration: underline; /* Gạch chân khi hover */
+}
+main {
+    flex: 1;
+}
+img.rounded-circle {
+    border-radius: 50%;
+    object-fit: cover;
+}
+.container {
+	max-width: 500px;
+	margin: 50px auto;
+	background-color: #fff;
+	padding: 30px;
+	border-radius: 20px;
+	box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);
+	border: 2px solid #c82333; /* Viền đỏ */
+}
+#file-name {
+	margin-left: 10px;
+}
+.btn-secondary {
+	border-radius: 50px;
+}
+.avatar-container {
+    text-align: center;
+    margin-bottom: 20px; /* Khoảng cách dưới avatar */
+}
+.avatar {
+    width: 75px; /* Đặt kích thước avatar to hơn */
+    height: 75px;
+    border-radius: 50%; /* Bo tròn để tạo hình tròn */
+    object-fit: cover;
+	transition: width 0.3s, height 0.3s;
+}
+.sidebar .avatar-container h5 {
+    margin-top: 20px;
+    font-weight: bold;
+}
+a {
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: none;
+	color: #E0E0E0
+}
+.nav-item a {
+    color: #ffffff !important; /* Màu trắng */
+    font-weight: bold; /* Chữ đậm */
+}
+.nav-item a:hover {
+    color: #E0E0E0 !important; /* Màu trắng */
+    font-weight: bold; /* Chữ đậm */
+}
+.pass-font {
+	font-size: 1.25rem;
+}
+.table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	border-radius: 15px;
+	overflow: hidden;
+}
+.delete-btn {
+    border-radius: 50px;
+}
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 250px;
+    background-color: #343a40;
+    padding-top: 20px;
+	position: fixed;
+	transition: width 0.3s;
+	padding: 10px;
+	border-radius: 15px;
+	overflow: hidden;
+	box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+}
+.sidebar.collapsed {
+	width: 80px;
+}
+.sidebar.collapsed a {
+	text-align: center;
+}
+.content {
+	margin-left: 250px;
+	padding: 20px;
+	transition: margin-left 0.3s;
+	width: calc(100% - 250px);
+}
+.main {
+	flex: 1;
+}
+.collapsed + .content {
+	margin-left: 80px;
+	width: calc(100% - 80px);
+}
+.hamburger {
+	cursor: pointer;
+	color: white;
+	font-size: 20px;
+	left: 5px;
+	top: 5px;
+	position: absolute;
+}
+.sidebar.collapsed .avatar {
+	width: 40px;
+	height: 40px;
+}
+.sidebar.collapsed .nav-text {
+	display: none;
+}
+.icon {
+    font-size: 1.5rem;
+    transition: font-size 0.3s;
+}
+.sidebar.collapsed .icon {
+    font-size: 2rem;
+}
+.nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+.sidebar.collapsed .nav-item {
+    justify-content: center;
+}
+.nav {
+	padding-left: 50px;
+}
+.sidebar.collapsed .nav {
+	padding-left: 0px;
+}
+.document-link {
+    display: block;
+    width: 100%;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+}
+.document-list a {
+	color: #000000;
+	cursor: pointer;
+}
+.actions {
+	display: flex;
+	gap: 10px; /* Khoảng cách giữa các nút */
+}
+.pagination li {
+    display: inline;
+    margin: 0 5px;
+	color: white; /* Màu chữ khi hover */
+}
+.pagination a {
+    text-decoration: none;
+    color: white; /* Màu chữ khi hover */
+    padding: 5px 10px;
+    border-radius: 4px;
+	background-color: #ff0000;
+}
+.pagination a:hover {
+    background-color: darkred; /* Nền khi hover */
+    color: white; /* Màu chữ khi hover */
+}
+.pagination .page-link {
+    border-radius: 50%; /* Tạo bo tròn cho các nút */
+    width: 40px; /* Đặt chiều rộng cố định */
+    height: 40px; /* Đặt chiều cao cố định */
+    display: flex; /* Để căn giữa nội dung bên trong */
+    align-items: center; /* Căn giữa dọc */
+    justify-content: center; /* Căn giữa ngang */
+    margin: 0 5px; /* Khoảng cách giữa các nút */
+    font-size: 16px; /* Kích thước chữ */
+    color: white; /* Màu chữ */
+    background-color: #dc3545; /* Màu nền mặc định */
+    border: 1px solid #dee2e6; /* Đường viền */
+}
+.pagination .page-link:hover {
+    background-color: #007bff; /* Màu nền khi hover */
+    color: white; /* Màu chữ khi hover */
+}
+.pagination .page-item.active .page-link {
+    background-color: #ff0000; /* Màu nền cho trang hiện tại */
+    border-color: #007bff; /* Màu viền cho trang hiện tại */
+    color: white; /* Màu chữ cho trang hiện tại */
+}
+.pagination .page-link:focus {
+    box-shadow: none; /* Xóa hiệu ứng shadow khi focus */
+}
+.pagination .active {
+    border-radius: 50%; /* Tạo bo tròn cho các nút */
+    width: 40px; /* Đặt chiều rộng cố định */
+    height: 40px; /* Đặt chiều cao cố định */
+    display: flex; /* Để căn giữa nội dung bên trong */
+    align-items: center; /* Căn giữa dọc */
+    justify-content: center; /* Căn giữa ngang */
+    margin: 0 5px; /* Khoảng cách giữa các nút */
+    font-size: 16px; /* Kích thước chữ */
+    color: white; /* Màu chữ */
+    background-color: darkred; /* Màu nền mặc định */
+    border: 1px solid #dee2e6; /* Đường viền */
+}
+a:active {
+    color: #0056b3; /* Màu khi click */
+    text-decoration: none; /* Giữ nguyên không gạch chân khi click */
+    outline: none; /* Bỏ viền outline */
+}
+/* Tùy chỉnh vị trí của modal */
+.modal-dialog-custom {
+    position: absolute;
+    top: 10px;  /* Đặt khoảng cách từ trên cùng của trang */
+    right: 10px; /* Đặt khoảng cách từ bên phải của trang */
+    margin: 0; /* Loại bỏ margin mặc định của Bootstrap modal */
+    width: 500px; /* Đặt chiều rộng tùy chỉnh cho modal */
+}
+.modal-content {
+    border-radius: 10px; /* Tùy chỉnh góc bo của modal */
+}
+.wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* Đảm bảo trang luôn chiếm 100% chiều cao màn hình */
+}
+.icon-red {
+	color: red; /* Đặt màu đỏ cho icon */
+}
+.modal-title {
+	white-space: normal;
+}
+.small-title {
+	font-size: 14px; /* Bạn có thể thay đổi kích thước này */
+	line-height: 1.2; /* Điều chỉnh khoảng cách giữa các dòng */
+}
+.btn-danger {
+	background-color: #c82333;
+	border-color: #bd2130;
+	border-radius: 50px;
+}
+.file-info {
+	color: red;
+	font-weight: bold;	
+}
+.input-group .form-control-file,
+.input-group .btn-warning {
+	height: auto; /* Để các phần tử căn chỉnh chiều cao theo nội dung */
+	display: inline-block;
+	vertical-align: middle; /* Giúp căn chỉnh hai phần tử trên cùng một dòng */
+}
+/* Điều chỉnh chiều cao cho nút "Xóa tệp" */
+.input-group .btn-warning {
+	padding: .375rem .75rem;
+	height: calc(2.25rem + 2px); /* Điều chỉnh chiều cao để khớp với input file */
+	line-height: 1.5; /* Điều chỉnh khoảng cách bên trong */
+}
+.btn-success {
+	border-radius: 20px; 
+	padding: 10px 20px;
+}
+.edit-wrapper {
+    max-width: 900px;
+    margin: 40px auto;
+}
+
+.edit-form {
+    background: #ffffff;
+    padding: 30px 35px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+.form-label {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.form-control {
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+textarea.form-control {
+    resize: vertical;
+}
+
+button.btn-success {
+    font-weight: 600;
+}
+
+body {
+    background-color: #f8f9fa;
+}

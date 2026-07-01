@@ -1,0 +1,20 @@
+!Lấy loại văn bản từ document_type.
+!Sửa lại trang thêm văn bản để sau khi thêm văn bản thành công sẽ quay về trang chính.
+!Sửa trang thêm văn bản: Nút lọc văn bản chỉ cho chọn các văn bản doc docx pdf.
+!Sửa trang thêm văn bản: Đổi tiêu đề văn bản thành số hiệu văn bản.
+!Sửa trang thêm văn bản: Kiểm tra số hiệu văn bản để tránh nhập trùng.
+!Sửa trang thêm văn bản: Giữ nguyên các giá trị đã nhập. Người sử dụng vẫn phải tải lại tập tin.
+!Sửa trang thêm loại văn bản: Báo lỗi khi loại văn bản nhập vào đã có.
+!Sửa thêm nhắc nhở khi xóa chi tiết hơn: có tên văn bản muốn xóa: Sửa tất cả các trang quản lý loại văn bản, văn bản, người dùng.
+!Quản lý loại văn bản: chức năng thêm, sửa, xóa.
+!Sửa lỗi file view_document sau khi cập nhật document_type, sửa nút quay lại bảng điều khiển.
+!Trang điều khiển: Không hiển thị cột cơ quan ban hành để xem cho dễ.
+!Sao lưu cơ sở dữ liệu khi mở dashboard. (đã thực hiện).
+!Thêm cột ngày có hiệu lực của văn bản. Sửa thêm, sửa, xem văn bản.
+!Chuyển trang xem văn bản thành dạng cột cho đẹp hơn.
+!Ghi nhật ký hoạt động khi thêm văn bản.
+!Thêm cột tình trạng hiệu lực, sửa thêm văn bản, sửa văn bản, xem văn bản.
+!Tách bảng nơi ban hành riêng.
+Sau khi sửa văn bản xong thì quay về trang xem văn bản.
+Cần thêm chức năng thêm sửa và các chức năng khác liên quan đến nơi ban hành.
+Click vào ô nội dung sẽ xem được nội dung văn bản.
