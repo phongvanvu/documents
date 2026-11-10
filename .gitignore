@@ -1,0 +1,24 @@
+# Dữ liệu tài liệu tải lên (loại trừ toàn bộ tệp và thư mục con trong uploads/)
+uploads/*
+!uploads/.htaccess
+!uploads/**/.gitkeep
+
+# Bản sao lưu CSDL (chứa dữ liệu nhạy cảm)
+backups/*
+!backups/.gitkeep
+*.sql
+*.sql.gz
+
+# Thư viện phụ thuộc bên thứ 3
+vendor/
+
+# Tệp tạm thời, nhật ký và hệ điều hành
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Cấu hình IDE / Trình soạn thảo
+.vscode/
+.idea/

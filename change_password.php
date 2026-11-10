@@ -2,14 +2,22 @@
 // Khởi động session
 session_start();
 
-// Kiểm tra nếu người dùng chưa đăng nhập
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
-}
-
 // Kết nối đến cơ sở dữ liệu
 include 'db.php';
+
+// Kiểm tra nếu người dùng chưa đăng nhập
+if (!isset($_SESSION['user_id'])) {
+    if (isset($_COOKIE['username']) && isset($_COOKIE['user_id'])) {
+        $_SESSION['user_name'] = $_COOKIE['username'];
+        $_SESSION['user_id'] = $_COOKIE['user_id'];
+        $_SESSION['full_name'] = $_COOKIE['full_name'] ?? '';
+        $_SESSION['role'] = $_COOKIE['role'] ?? 'viewer';
+        $_SESSION['avatar'] = $_COOKIE['avatar'] ?? '';
+    } else {
+        header('Location: login.php');
+        exit;
+    }
+}
 
 // Khai báo biến để lưu thông tin và lỗi
 $current_password = $new_password = $confirm_password = "";
@@ -27,13 +35,15 @@ $stmt->close();
 
 // Xử lý khi form được submit
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $current_password = trim($_POST['current_password']);
-    $new_password = trim($_POST['new_password']);
-    $confirm_password = trim($_POST['confirm_password']);
+    $current_password = trim($_POST['current_password'] ?? '');
+    $new_password = trim($_POST['new_password'] ?? '');
+    $confirm_password = trim($_POST['confirm_password'] ?? '');
 
     // Kiểm tra xem các trường có được nhập đầy đủ không
     if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
         $error_message = "Vui lòng nhập đầy đủ thông tin.";
+    } elseif (strlen($new_password) < 6) {
+        $error_message = "Mật khẩu mới phải có ít nhất 6 ký tự.";
     } elseif ($new_password !== $confirm_password) {
         $error_message = "Mật khẩu mới và xác nhận mật khẩu không khớp.";
     } else {
@@ -57,6 +67,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt->bind_param("si", $new_hashed_password, $user_id);
 
             if ($stmt->execute()) {
+                // Xóa thông tin cookie nếu có để bắt buộc đăng nhập lại
+                setcookie("user_id", "", time() - 3600, "/");
+                setcookie("username", "", time() - 3600, "/");
+                
                 // Xóa thông tin người dùng khỏi session và yêu cầu đăng nhập lại
                 session_unset();
                 session_destroy();
@@ -71,52 +85,138 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 }
+
+$title = "Đổi mật khẩu";
 include 'header.php';
 ?>
 
-<h2 class="mt-5 text-center">Thay Đổi Mật Khẩu</h2>
+<div class="container-fluid main">
+    <div class="row flex-nowrap">
+        <div id="sidebar" class="col-auto col-md-3 col-xl-2 px-0 bg-danger sidebar">
+            <?php include 'sidebar.php'; ?>
+        </div>
 
-<!-- Hiển thị thông tin tên người dùng -->
-<p class="text-center"><strong>Tên người dùng: <?php echo htmlspecialchars($user_name); ?></strong></p>
+        <div id="content" class="content col py-3">
+            <div class="container mt-4 mb-5" style="max-width: 600px;">
+                
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4 class="mb-0 text-dark fw-bold">
+                        <i class="fas fa-key text-danger me-2"></i>Đổi mật khẩu
+                    </h4>
+                    <!-- Đã sửa thành documents.php -->
+                    <a href="documents.php" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i>Trở về
+                    </a>
+                </div>
 
-<!-- Hiển thị thông báo lỗi hoặc thành công -->
-<?php if (!empty($error_message)): ?>
-    <div class="alert alert-danger">
-        <?php echo htmlspecialchars($error_message); ?>
-    </div>
-<?php endif; ?>
+                <div class="card border-0 shadow-sm rounded-3">
+                    <div class="card-body p-4 p-md-5">
+                        <div class="text-center mb-4">
+                            <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 80px; height: 80px;">
+                                <i class="fas fa-user-shield fa-2x text-secondary"></i>
+                            </div>
+                            <h5 class="fw-bold mb-1"><?= htmlspecialchars($user_name, ENT_QUOTES, 'UTF-8'); ?></h5>
+                            <p class="text-muted small">Hãy cập nhật mật khẩu thường xuyên để bảo vệ tài khoản</p>
+                        </div>
 
-<?php if (!empty($success_message)): ?>
-    <div class="alert alert-success">
-        <?php echo htmlspecialchars($success_message); ?>
-    </div>
-<?php endif; ?>
+                        <?php if (!empty($error_message)): ?>
+                            <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
+                                <i class="fas fa-exclamation-circle flex-shrink-0 me-2"></i>
+                                <div><?= htmlspecialchars($error_message, ENT_QUOTES, 'UTF-8'); ?></div>
+                            </div>
+                        <?php endif; ?>
 
-<!-- Form thay đổi mật khẩu -->
-<form action="change_password.php" method="POST" class="mt-4">
-    <div class="form-group">
-        <label for="current_password">Mật khẩu hiện tại:</label>
-        <input type="password" class="form-control" id="current_password" name="current_password" required>
-    </div>
-    <div class="form-group">
-        <label for="new_password">Mật khẩu mới:</label>
-        <input type="password" class="form-control" id="new_password" name="new_password" required>
-    </div>
-    <div class="form-group">
-        <label for="confirm_password">Xác nhận mật khẩu mới:</label>
-        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
-    </div>
-    <button type="submit" class="btn btn-primary">Cập nhật mật khẩu</button>
-</form>
+                        <form action="change_password.php" method="POST">
+                            <div class="mb-3">
+                                <label for="current_password" class="form-label fw-semibold">Mật khẩu hiện tại <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="fas fa-unlock-alt text-muted"></i></span>
+                                    <input type="password" class="form-control" id="current_password" name="current_password" required placeholder="Nhập mật khẩu đang sử dụng">
+                                    <button class="btn btn-outline-secondary toggle-password" type="button" tabindex="-1"><i class="fas fa-eye"></i></button>
+                                </div>
+                            </div>
 
-<!-- Nút quay lại trang điều khiển -->
-<div class="text-center mt-4">
-    <a href="dashboard.php" class="btn btn-secondary">Quay lại Trang Điều Khiển</a>
+                            <div class="mb-3">
+                                <label for="new_password" class="form-label fw-semibold">Mật khẩu mới <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="fas fa-lock text-muted"></i></span>
+                                    <input type="password" class="form-control" id="new_password" name="new_password" required placeholder="Tối thiểu 6 ký tự">
+                                    <button class="btn btn-outline-secondary toggle-password" type="button" tabindex="-1"><i class="fas fa-eye"></i></button>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="confirm_password" class="form-label fw-semibold">Xác nhận mật khẩu mới <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="fas fa-check-circle text-muted"></i></span>
+                                    <input type="password" class="form-control" id="confirm_password" name="confirm_password" required placeholder="Nhập lại mật khẩu mới">
+                                    <button class="btn btn-outline-secondary toggle-password" type="button" tabindex="-1"><i class="fas fa-eye"></i></button>
+                                </div>
+                                <div class="form-text mt-2" id="password_match_message"></div>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-danger py-2 fw-bold" id="submitBtn">
+                                    <i class="fas fa-save me-2"></i>Cập nhật mật khẩu
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Xử lý nút ẩn/hiện mật khẩu
+    const toggleButtons = document.querySelectorAll('.toggle-password');
+    toggleButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            const icon = this.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        });
+    });
+
+    // Kiểm tra trực tiếp xem 2 mật khẩu mới có khớp nhau không
+    const newPassword = document.getElementById('new_password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const matchMessage = document.getElementById('password_match_message');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function checkPasswordMatch() {
+        if (confirmPassword.value === '') {
+            matchMessage.innerHTML = '';
+            submitBtn.disabled = false;
+            return;
+        }
+
+        if (newPassword.value === confirmPassword.value) {
+            matchMessage.innerHTML = '<span class="text-success"><i class="fas fa-check me-1"></i>Mật khẩu khớp nhau</span>';
+            submitBtn.disabled = false;
+        } else {
+            matchMessage.innerHTML = '<span class="text-danger"><i class="fas fa-times me-1"></i>Mật khẩu không khớp</span>';
+            submitBtn.disabled = true;
+        }
+    }
+
+    newPassword.addEventListener('input', checkPasswordMatch);
+    confirmPassword.addEventListener('input', checkPasswordMatch);
+});
+</script>
 
 <?php
 include 'footer.php';
-
-// Đóng kết nối cơ sở dữ liệu
 $conn->close();
 ?>

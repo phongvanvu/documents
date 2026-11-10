@@ -1,0 +1,6 @@
+# Chặn thực thi mã nguồn PHP và các tệp nguy hiểm
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|phps|cgi|pl|exe|sh|py)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+Options -Indexes

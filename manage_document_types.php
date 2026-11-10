@@ -1,166 +1,253 @@
 <?php
-// Khởi động session
 session_start();
 
-// Kiểm tra nếu người dùng chưa đăng nhập hoặc không phải là admin
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-    header('Location: login.php');
+// Kiểm tra quyền (Chỉ Admin mới được vào)
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+    header('Location: dashboard.php');
     exit;
 }
 
-// Kết nối đến cơ sở dữ liệu
 include 'db.php';
 
-// Thiết lập số lượng bản ghi trên mỗi trang
-$limit = 10;
+function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
-// Lấy số trang hiện tại, mặc định là 1 nếu không có tham số page
-$page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-$offset = ($page - 1) * $limit;  // Tính toán vị trí bắt đầu của bản ghi
+// Cấu hình phân trang
+$limit = 10;
+$page = max(1, intval($_GET['page'] ?? 1));
+$offset = ($page - 1) * $limit;
 
 // Xử lý tìm kiếm
-$search = isset($_GET['search']) ? $_GET['search'] : '';
+$search = trim($_GET['search'] ?? '');
 $search_query = '%' . $search . '%';
 
-// Xử lý xóa loại văn bản nếu có yêu cầu
+// =========================================================================
+// XỬ LÝ LỆNH XÓA (CÓ KIỂM TRA RÀNG BUỘC DỮ LIỆU)
+// =========================================================================
 if (isset($_GET['delete'])) {
-    $document_type_id = intval($_GET['delete']);
-    $stmt = $conn->prepare("DELETE FROM document_types WHERE id = ?");
-    $stmt->bind_param("i", $document_type_id);
-    if ($stmt->execute()) {
-        $success_message = "Xóa loại văn bản thành công.";
+    $type_id = intval($_GET['delete']);
+    
+    // 1. Kiểm tra xem Loại văn bản này có đang được sử dụng không
+    $check_stmt = $conn->prepare("SELECT COUNT(*) FROM documents WHERE document_type_id = ?");
+    $check_stmt->bind_param("i", $type_id);
+    $check_stmt->execute();
+    $check_stmt->bind_result($used_count);
+    $check_stmt->fetch();
+    $check_stmt->close();
+
+    if ($used_count > 0) {
+        $_SESSION['flash_error'] = "Không thể xóa! Loại văn bản này đang được gắn cho {$used_count} văn bản. Vui lòng sử dụng tính năng 'Gộp danh mục' để thay thế.";
     } else {
-        $error_message = "Có lỗi xảy ra khi xóa loại văn bản.";
+        // Xóa an toàn nếu không có bản ghi phụ thuộc
+        $stmt = $conn->prepare("DELETE FROM document_types WHERE id = ?");
+        $stmt->bind_param("i", $type_id);
+        if ($stmt->execute()) {
+            $_SESSION['flash_msg'] = "Xóa loại văn bản thành công!";
+        } else {
+            $_SESSION['flash_error'] = "Có lỗi hệ thống xảy ra khi xóa.";
+        }
+        $stmt->close();
     }
-    $stmt->close();
+    
+    // Chuyển hướng lại trang
+    $params = [];
+    if (!empty($search)) $params['search'] = $search;
+    if ($page > 1) $params['page'] = $page;
+    $redirect_url = "manage_document_types.php" . (!empty($params) ? '?' . http_build_query($params) : '');
+    
+    header("Location: " . $redirect_url);
+    exit;
 }
 
-// Truy vấn danh sách loại văn bản với tìm kiếm và phân trang
-$query = "SELECT id, type_name FROM document_types WHERE type_name LIKE ? LIMIT ?, ?";
+// =========================================================================
+// TRUY VẤN DỮ LIỆU (Đếm số lượng văn bản đang gắn loại này)
+// =========================================================================
+$query = "SELECT dt.id, dt.type_name, COUNT(d.id) AS doc_count 
+          FROM document_types dt 
+          LEFT JOIN documents d ON dt.id = d.document_type_id 
+          WHERE dt.type_name LIKE ? 
+          GROUP BY dt.id 
+          ORDER BY dt.id DESC 
+          LIMIT ?, ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("sii", $search_query, $offset, $limit);
 $stmt->execute();
 $result = $stmt->get_result();
 
-// Đếm tổng số bản ghi để tạo phân trang với tìm kiếm
-$total_query = "SELECT COUNT(*) AS total FROM document_types WHERE type_name LIKE ?";
-$total_stmt = $conn->prepare($total_query);
+// Đếm tổng số bản ghi để phân trang
+$total_stmt = $conn->prepare("SELECT COUNT(*) AS total FROM document_types WHERE type_name LIKE ?");
 $total_stmt->bind_param("s", $search_query);
 $total_stmt->execute();
-$total_result = $total_stmt->get_result();
-$total_row = $total_result->fetch_assoc();
-$total_records = $total_row['total'];
-$total_pages = ceil($total_records / $limit); // Tổng số trang
+$total_records = $total_stmt->get_result()->fetch_assoc()['total'] ?? 0;
+$total_stmt->close();
 
+$total_pages = (int)ceil($total_records / $limit);
+
+$title = "Quản lý Loại Văn bản";
 include 'header.php';
 ?>
-<!-- Sidebar -->
-<div id="sidebar" class="col-auto col-md-3 col-xl-2 px-sm-2 px-0 bg-danger sidebar">
-    <?php include 'sidebar.php'; ?>
-</div>
-<!-- Nội dung chính -->
-<div id="content" class="content" class="col py-3">
 
-<h2 class="mt-3 text-center">Quản lý Loại Văn bản</h2>
+<div class="container-fluid main">
+    <div class="row flex-nowrap">
+        <div id="sidebar" class="col-auto col-md-3 col-xl-2 px-0 bg-danger sidebar">
+            <?php include 'sidebar.php'; ?>
+        </div>
 
-<?php if (isset($success_message)): ?>
-    <div class="alert alert-success">
-        <?php echo htmlspecialchars($success_message); ?>
-    </div>
-<?php elseif (isset($error_message)): ?>
-    <div class="alert alert-danger">
-        <?php echo htmlspecialchars($error_message); ?>
-    </div>
-<?php endif; ?>
+        <div id="content" class="content col py-3">
+            <div class="container-fluid mt-2 mb-4">
+                
+                <!-- Page Header -->
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+                    <div>
+                        <h4 class="fw-bold mb-0 text-dark"><i class="fas fa-tags me-2 text-danger"></i>QUẢN LÝ LOẠI VĂN BẢN</h4>
+                        <small class="text-muted">Danh mục các loại văn bản áp dụng trong hệ thống</small>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <a href="merge_categories.php" class="btn btn-outline-danger fw-bold"><i class="fas fa-object-group me-1"></i>Gộp danh mục</a>
+                        <a href="add_document_type.php" class="btn btn-danger fw-bold"><i class="fas fa-plus-circle me-1"></i>Thêm mới</a>
+                    </div>
+                </div>
 
-<!-- Form tìm kiếm -->
-<form action="manage_document_types.php" method="GET" class="mb-4">
-    <div class="row">
-        <div class="col-md-10">
-            <div class="form-group">
-                <input type="text" class="form-control" name="search" placeholder="Tìm kiếm loại văn bản" value="<?php echo htmlspecialchars($search); ?>">
+                <!-- Ô tìm kiếm -->
+                <div class="card shadow-sm border-0 mb-3">
+                    <div class="card-body p-3">
+                        <form action="manage_document_types.php" method="GET" class="mb-0">
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-search text-muted"></i></span>
+                                <input type="text" class="form-control" name="search" placeholder="Nhập tên loại văn bản cần tìm..." value="<?= e($search) ?>">
+                                <button type="submit" class="btn btn-danger px-4 fw-bold">Tìm kiếm</button>
+                                <?php if (!empty($search)): ?>
+                                    <a href="manage_document_types.php" class="btn btn-outline-secondary px-3">Xóa lọc</a>
+                                <?php endif; ?>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Bảng danh sách -->
+                <div class="card shadow-sm border-0 mb-3">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light text-center">
+                                    <tr>
+                                        <th style="width: 80px;">ID</th>
+                                        <th class="text-start">Tên Loại Văn Bản</th>
+                                        <th style="width: 180px;">Đang sử dụng</th>
+                                        <th style="width: 160px;">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if ($result->num_rows > 0): ?>
+                                        <?php while ($row = $result->fetch_assoc()): ?>
+                                            <tr>
+                                                <td class="text-center fw-bold text-secondary"><?= (int)$row['id'] ?></td>
+                                                <td class="text-start fw-semibold text-dark">
+                                                    <i class="fas fa-tag text-danger me-2"></i><?= e($row['type_name']) ?>
+                                                </td>
+                                                <td class="text-center">
+                                                    <?php if ($row['doc_count'] > 0): ?>
+                                                        <span class="badge bg-success rounded-pill px-3 py-2"><?= (int)$row['doc_count'] ?> văn bản</span>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-secondary rounded-pill px-3 py-2 text-white-50">Chưa sử dụng</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="text-center">
+                                                    <a href="edit_document_type.php?id=<?= (int)$row['id'] ?>" class="btn btn-outline-secondary btn-sm px-2 me-1" title="Chỉnh sửa"><i class="fas fa-edit me-1"></i>Sửa</a>
+                                                    
+                                                    <?php if ($row['doc_count'] > 0): ?>
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm px-2" onclick="Swal.fire('Không thể xóa', 'Loại văn bản này đang được dùng cho <?= $row['doc_count'] ?> văn bản. Hãy dùng tính năng Gộp danh mục!', 'info');"><i class="fas fa-trash-alt me-1"></i>Xóa</button>
+                                                    <?php else: ?>
+                                                        <button type="button" class="btn btn-outline-danger btn-sm px-2 delete-type-btn" data-id="<?= (int)$row['id'] ?>" data-name="<?= e($row['type_name']) ?>"><i class="fas fa-trash-alt me-1"></i>Xóa</button>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="4" class="text-center py-5 text-muted">
+                                                <i class="fas fa-folder-open fa-2x mb-2 text-light"></i><br>
+                                                <?= empty($search) ? "Chưa có dữ liệu loại văn bản nào." : "Không tìm thấy kết quả phù hợp."; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phân trang -->
+                <?php if ($total_pages > 1): ?>
+                    <nav aria-label="Page navigation" class="mt-3">
+                        <ul class="pagination justify-content-center">
+                            <?php if ($page > 1): ?>
+                                <li class="page-item"><a class="page-link" href="?search=<?= urlencode($search) ?>&page=1">&laquo;</a></li>
+                                <li class="page-item"><a class="page-link" href="?search=<?= urlencode($search) ?>&page=<?= $page - 1 ?>">&lsaquo;</a></li>
+                            <?php endif; ?>
+                            
+                            <?php 
+                            $start = max(1, $page - 2); $end = min($total_pages, $start + 4);
+                            if ($end - $start < 4) $start = max(1, $end - 4);
+                            for ($i = $start; $i <= $end; $i++): ?>
+                                <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
+                                    <a class="page-link" href="<?= ($i == $page) ? '#' : '?search=' . urlencode($search) . '&page=' . $i ?>"><?= $i ?></a>
+                                </li>
+                            <?php endfor; ?>
+                            
+                            <?php if ($page < $total_pages): ?>
+                                <li class="page-item"><a class="page-link" href="?search=<?= urlencode($search) ?>&page=<?= $page + 1 ?>">&rsaquo;</a></li>
+                                <li class="page-item"><a class="page-link" href="?search=<?= urlencode($search) ?>&page=<?= $total_pages ?>">&raquo;</a></li>
+                            <?php endif; ?>
+                        </ul>
+                    </nav>
+                <?php endif; ?>
+
             </div>
         </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-primary btn-block">Tìm kiếm</button>
-        </div>
     </div>
-</form>
-
-<div class="document-type-management">
-    <a href="add_document_type.php" class="btn btn-success mb-3">Thêm Loại Văn bản mới</a>
-
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Tên Loại Văn bản</th>
-                <th>Hành động</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if ($result->num_rows > 0): ?>
-                <?php while ($row = $result->fetch_assoc()): ?>
-                    <tr>
-                        <td><?php echo htmlspecialchars($row['id']); ?></td>
-                        <td><?php echo htmlspecialchars($row['type_name']); ?></td>
-                        <td>
-                            <a href="edit_document_type.php?id=<?php echo $row['id']; ?>" class="btn btn-warning btn-sm">Sửa</a>
-                            <a href="manage_document_types.php?delete=<?php echo $row['id']; ?>" class="btn btn-danger btn-sm" onclick="return confirmDelete('<?php echo $row['type_name']; ?>');">Xóa</a>
-                        </td>
-                    </tr>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <tr>
-                    <td colspan="3" class="text-center">Không có loại văn bản nào.</td>
-                </tr>
-            <?php endif; ?>
-        </tbody>
-    </table>
 </div>
-
-<!-- Phân trang -->
-<?php if ($total_pages > 1): ?>  <!-- Kiểm tra nếu tổng số trang > 1 thì mới hiển thị phân trang -->
-<nav aria-label="Page navigation">
-    <ul class="pagination justify-content-center">
-        <?php if ($page > 1): ?>
-            <li class="page-item">
-                <a class="page-link" href="?search=<?php echo urlencode($search); ?>&page=<?php echo $page - 1; ?>" aria-label="Previous">
-                    <span aria-hidden="true">&laquo;</span>
-                </a>
-            </li>
-        <?php endif; ?>
-        
-        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-            <li class="page-item <?php if ($i == $page) echo 'active'; ?>">
-                <?php if ($i == $page): ?>
-                    <?php echo $i; ?>
-                <?php else: ?>
-                    <a class="page-link" href="?search=<?php echo urlencode($search); ?>&page=<?php echo $i; ?>"><?php echo $i; ?></a>
-                <?php endif; ?>
-            </li>
-        <?php endfor; ?>
-        
-        <?php if ($page < $total_pages): ?>
-            <li class="page-item">
-                <a class="page-link" href="?search=<?php echo urlencode($search); ?>&page=<?php echo $page + 1; ?>" aria-label="Next">
-                    <span aria-hidden="true">&raquo;</span>
-                </a>
-            </li>
-        <?php endif; ?>
-    </ul>
-</nav>
-<?php endif; ?>  <!-- Kết thúc kiểm tra tổng số trang -->
 
 <script>
-function confirmDelete(documentTitle) {
-    return confirm('Bạn có chắc chắn muốn xóa loại văn bản: ' + documentTitle + '?');
-}
-</script>
-</div>
-<?php
-include 'footer.php';
+document.addEventListener('DOMContentLoaded', function() {
+    // Thông báo Flash Messages
+    <?php if (isset($_SESSION['flash_msg'])): ?>
+        if (typeof Swal !== 'undefined') Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: <?= json_encode($_SESSION['flash_msg'], JSON_UNESCAPED_UNICODE) ?>, showConfirmButton: false, timer: 3000 });
+        <?php unset($_SESSION['flash_msg']); ?>
+    <?php endif; ?>
+    
+    <?php if (isset($_SESSION['flash_error'])): ?>
+        if (typeof Swal !== 'undefined') Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: <?= json_encode($_SESSION['flash_error'], JSON_UNESCAPED_UNICODE) ?>, showConfirmButton: false, timer: 4000 });
+        <?php unset($_SESSION['flash_error']); ?>
+    <?php endif; ?>
 
-// Đóng kết nối cơ sở dữ liệu
-$conn->close();
+    // Nút Xóa với SweetAlert2
+    document.querySelectorAll('.delete-type-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            let id = this.getAttribute('data-id');
+            let name = this.getAttribute('data-name');
+            let url = 'manage_document_types.php?delete=' + id + '<?= !empty($search) ? "&search=" . urlencode($search) : "" ?>' + '<?= $page > 1 ? "&page=" . $page : "" ?>';
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Xóa loại văn bản?',
+                    text: "Bạn có chắc chắn muốn xóa '" + name + "' không?",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Đồng ý xóa!',
+                    cancelButtonText: 'Hủy'
+                }).then((res) => { if (res.isConfirmed) window.location.href = url; });
+            } else {
+                if (confirm("Bạn có chắc chắn muốn xóa '" + name + "' không?")) window.location.href = url;
+            }
+        });
+    });
+});
+</script>
+
+<?php 
+$stmt->close();
+include 'footer.php'; 
 ?>

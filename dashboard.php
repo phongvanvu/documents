@@ -1,286 +1,297 @@
 <?php
-// Khởi động session
 session_start();
-
-// Kết nối đến cơ sở dữ liệu
 include 'db.php';
 
-// Kiểm tra nếu người dùng chưa đăng nhập
 if (!isset($_SESSION['user_id'])) {
-    if (isset($_COOKIE['username'])) {
+    if (isset($_COOKIE['username']) && isset($_COOKIE['user_id'])) {
         $_SESSION['user_name'] = $_COOKIE['username'];
         $_SESSION['user_id'] = $_COOKIE['user_id'];
-        $_SESSION['full_name'] = $_COOKIE['full_name'];
-        $_SESSION['role'] = $_COOKIE['role'];
-        $_SESSION['avatar'] = $_COOKIE['avatar'];
+        $_SESSION['role'] = $_COOKIE['role'] ?? 'viewer';
     } else {
         header('Location: login.php');
         exit;
     }
 }
 
-// Lấy thông tin người dùng từ session
-$user_id = $_SESSION['user_id'];
-$user_name = isset($_SESSION['user_name']) ? $_SESSION['user_name'] : 'Khách';
-$user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'viewer';
+function h($value) { return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8'); }
 
-// Kết nối tới cơ sở dữ liệu và lấy thông tin avatar
-$sql = "SELECT avatar FROM users WHERE id = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
+// ==========================================
+// 1. TỐI ƯU HÓA: GỘP 4 TRUY VẤN THỐNG KÊ THÀNH 1
+// ==========================================
+$sql_summary = "SELECT 
+    COUNT(*) as total_docs,
+    SUM(CASE WHEN status = 'Còn hiệu lực' THEN 1 ELSE 0 END) as valid_docs,
+    SUM(CASE WHEN is_favorite = 1 THEN 1 ELSE 0 END) as favorite_docs,
+    SUM(CASE WHEN UPPER(document_number) LIKE '%-M%' 
+               OR UPPER(document_number) LIKE '%/M%' 
+               OR UPPER(document_number) LIKE '% M %' 
+               OR UPPER(document_number) LIKE '%MẬT%' THEN 1 ELSE 0 END) as secret_docs
+FROM documents";
 
-$_SESSION['avatar'] = ($result->num_rows > 0) ? $result->fetch_assoc()['avatar'] : "uploads/avatars/default.jpg";
+$summary_result = $conn->query($sql_summary)->fetch_assoc();
 
-// Kiểm tra và lấy dữ liệu từ form
-$search_query = htmlspecialchars($_GET['search_query'] ?? '', ENT_QUOTES, 'UTF-8');
-$search_column = htmlspecialchars($_GET['search_column'] ?? '', ENT_QUOTES, 'UTF-8');
-$document_type_filter = $_GET['document_type_id'] ?? '';
+$total_docs = $summary_result['total_docs'] ?? 0;
+$valid_docs = $summary_result['valid_docs'] ?? 0;
+$favorite_docs = $summary_result['favorite_docs'] ?? 0;
+$secret_docs = $summary_result['secret_docs'] ?? 0;
 
-// Số lượng mục trên mỗi trang
-$items_per_page = 20;
-$page = max(1, intval($_GET['page'] ?? 1));
-$start_from = ($page - 1) * $items_per_page;
-
-// Cấu trúc cơ bản của câu truy vấn
-$sql_base = "SELECT d.id, d.document_number,
-            CONCAT(dt.type_name, ' - ', d.document_number, ' - ', d.content) AS content,
-            d.issued_date, d.file_path
-            FROM documents d
-            JOIN document_types dt ON d.document_type_id = dt.id";
-
-// Xây dựng điều kiện tìm kiếm
-$where_clause = "";
-$params = [];
-$param_types = "";
-$search_param = '%' . $search_query . '%';
-
-if (empty($search_column)) {
-	// Tìm kiếm tất cả các cột
-    $where_clause = " WHERE (document_number LIKE ? OR content LIKE ? OR issued_date LIKE ? OR file_path LIKE ?)";
-    $search_param = '%' . $search_query . '%';
-    $params = array_fill(0, 4, $search_param); // 4 lần cho 4 cột
-	$param_types = "ssss";
-} elseif (in_array($search_column, ['document_number', 'content', 'issued_date', 'file_path'])) {
-    // Tìm kiếm theo cột cụ thể
-    $where_clause = " WHERE $search_column LIKE ?";
-    $params = ["%$search_query%"];
-    $param_types = "s";
-} else {
-    die("Cột không hợp lệ!");
+// ==========================================
+// 2. LẤY DỮ LIỆU BIỂU ĐỒ TRÒN (THEO TÌNH TRẠNG HIỆU LỰC)
+// ==========================================
+$status_query = $conn->query("SELECT status, COUNT(*) as count FROM documents GROUP BY status");
+$chart_status_labels = [];
+$chart_status_data = [];
+$chart_status_colors = [];
+$color_map = [
+    'Còn hiệu lực' => '#198754', // Xanh lá
+    'Hết hiệu lực' => '#6c757d', // Xám
+    'Được thay thế' => '#ffc107', // Vàng
+    'Không xác định' => '#0dcaf0', // Xanh nhạt
+    'Chưa biết' => '#ced4da'
+];
+while ($row = $status_query->fetch_assoc()) {
+    $st = $row['status'] ?: 'Chưa biết';
+    $chart_status_labels[] = $st;
+    $chart_status_data[] = $row['count'];
+    $chart_status_colors[] = $color_map[$st] ?? '#007bff';
 }
 
-// Lọc theo loại văn bản
-if (!empty($document_type_filter)) {
-    $where_clause .= " AND document_type_id = ?";
-    $params[] = $document_type_filter;
-	$param_types .= "s";
+// ==========================================
+// 3. LẤY DỮ LIỆU BIỂU ĐỒ CỘT (THEO LOẠI VĂN BẢN - TOP 5)
+// ==========================================
+$type_query = $conn->query("
+    SELECT dt.type_name, COUNT(d.id) as count 
+    FROM documents d 
+    LEFT JOIN document_types dt ON d.document_type_id = dt.id 
+    GROUP BY d.document_type_id 
+    ORDER BY count DESC 
+    LIMIT 5
+");
+$chart_type_labels = [];
+$chart_type_data = [];
+while ($row = $type_query->fetch_assoc()) {
+    $chart_type_labels[] = $row['type_name'] ?? 'Khác';
+    $chart_type_data[] = $row['count'];
 }
 
-// Tính tổng số mục
-$sql_count = "SELECT COUNT(*) AS total FROM documents" . $where_clause;
-$stmt = $conn->prepare($sql_count);
-$stmt->bind_param($param_types, ...$params);
-$stmt->execute();
-$total_rows = $stmt->get_result()->fetch_assoc()['total'];
+// ==========================================
+// 4. VĂN BẢN MỚI CẬP NHẬT GẦN ĐÂY
+// ==========================================
+$recent_docs = $conn->query("
+    SELECT id, document_number, content, issued_date, status 
+    FROM documents 
+    ORDER BY id DESC LIMIT 5
+")->fetch_all(MYSQLI_ASSOC);
 
-// Truy vấn để lấy kết quả cho trang hiện tại
-$sql = $sql_base . $where_clause . " ORDER BY issued_date DESC LIMIT ? OFFSET ?";
-$params[] = $items_per_page;  // Thêm limit vào mảng tham số
-$params[] = $start_from; // Thêm offset vào mảng tham số
-$param_types .= "ii"; // Thêm kiểu dữ liệu cho limit và offset
-
-$stmt = $conn->prepare("$sql");
-$stmt->bind_param($param_types, ...$params);
-$stmt->execute();
-$result = $stmt->get_result();
-$documents = $result->fetch_all(MYSQLI_ASSOC);
-
-// Thiết lập tiêu đề trang
-$title = "Trang chính";
+$title = "Tổng quan hệ thống";
 include 'header.php';
 ?>
+
+<!-- Chuyển Chart.js về Local để tăng tốc độ tải -->
+<script src="assets/plugins/chart.js"></script>
+
 <div class="container-fluid main">
     <div class="row flex-nowrap">
-        <?php include 'check_backup.php'; ?>
-        <!-- Sidebar -->
         <div id="sidebar" class="col-auto col-md-3 col-xl-2 px-sm-2 px-0 bg-danger sidebar">
             <?php include 'sidebar.php'; ?>
         </div>
-        <!-- Nội dung chính -->
-        <div id="content" class="content" class="col py-3">
-            <!-- Form tìm kiếm và bảng văn bản trong cùng một cột -->
+
+        <div id="content" class="content col py-3">
             <div class="col-md-12 mt-3">
-                <!-- Form tìm kiếm -->
-                <form action="" method="GET" class="mb-4">
-                    <div class="row g-2 align-items-center">
-                        <div class="col-md-4">
-                            <input type="text" name="search_query" class="form-control" placeholder="Tìm kiếm tài liệu..." value="<?php echo htmlspecialchars($search_query); ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <select name="search_column" class="form-control">
-                                <option value="">Tất cả các cột</option>
-                                <?php foreach (['document_number' => 'Số hiệu', 'content' => 'Trích yếu', 'issued_date' => 'Ngày ban hành', 'file_path' => 'Đường dẫn file'] as $value => $label): ?>
-                                    <option value="<?php echo $value; ?>" <?php echo ($search_column === $value) ? 'selected' : ''; ?>><?php echo $label; ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <select class="form-control" id="document_type_id" name="document_type_id">
-                                <option value="">Chọn loại văn bản</option>
-                                <?php 
-                                    // Lấy tất cả loại văn bản
-                                    $sql_types = "SELECT id, type_name FROM document_types ORDER BY type_name";
-                                    $types_result = $conn->query($sql_types);
-                                    while ($type = $types_result->fetch_assoc()): ?>
-                                        <option value="<?php echo htmlspecialchars($type['id']); ?>" <?php echo (isset($_GET['document_type_id']) && $_GET['document_type_id'] == $type['id']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($type['type_name']); ?>
-                                        </option>
-                                <?php endwhile; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-primary w-100">Tìm kiếm</button>
+                <h4 class="mb-4">Tổng quan hệ thống</h4>
+
+                <!-- HÀNG 1: CÁC THẺ THỐNG KÊ (CARDS) -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-primary text-white shadow-sm h-100 border-0 rounded-3">
+                            <div class="card-body d-flex align-items-center">
+                                <div class="fs-1 me-3"><i class="fas fa-file-alt"></i></div>
+                                <div>
+                                    <h6 class="card-title mb-0 text-white-50">Tổng số văn bản</h6>
+                                    <h2 class="mb-0 fw-bold"><?php echo h($total_docs); ?></h2>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </form>
-
-                <!-- Danh sách tài liệu -->
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover">
-                        <thead>
-                            <tr>
-                                <th class="text-center">Nội dung</th>
-                                <th class="text-center">Ngày ban hành</th>
-                                <th class="text-center">Tập tin</th>
-                                <th class="text-center">Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (count($documents) > 0): ?>
-                                <?php foreach ($documents as $document):
-                                    $formatted_date = date('d/m/Y', strtotime(htmlspecialchars($document['issued_date'])));
-                                    $file_type = pathinfo($document['file_path'], PATHINFO_EXTENSION);
-                                    $icon = ($file_type == 'pdf') ? '<i class="fas fa-file-pdf file-icon text-danger"></i>' :
-                                            (($file_type == 'doc' || $file_type == 'docx') ? '<i class="fas fa-file-word file-icon text-primary"></i>' : '<i class="fas fa-file file-icon"></i>');
-                                    ?>
-                                    <tr>
-                                        <td class="document-list justify-content">
-                                            <a href="<?php echo $document['file_path']; ?>" target="_blank" class="document-link">
-                                                <?php echo htmlspecialchars($document['content']); ?>
-                                            </a>
-                                        </td>
-                                        <td class="text-center"><?php echo $formatted_date; ?></td>
-                                        <td class="text-center">
-                                            <?php if (!empty($document['file_path'])): ?>
-                                                <a href="<?php echo $document['file_path']; ?>" target="_blank"><?php echo $icon; ?></a>
-                                            <?php else: ?>
-                                                Không có file
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="text-center">
-                                            <div class="actions">
-                                                <a href="view_document.php?id=<?php echo $document['id']; ?>" class="btn btn-primary btn-sm">Xem</a>
-                                                <?php if ($_SESSION['role'] === 'admin'): ?>
-                                                    <a href="edit_document.php?id=<?php echo $document['id']; ?>" class="btn btn-primary btn-sm">Sửa</a>
-                                                    <a href="delete_document.php?id=<?php echo $document['id']; ?>" class="btn btn-danger btn-sm delete-btn" data-id="<?php echo $document['id']; ?>">Xóa</a>
-                                                    <script>
-                                                        // Chọn tất cả các nút xóa
-                                                        document.querySelectorAll('.delete-btn').forEach(button => {
-                                                            button.addEventListener('click', function(event) {
-                                                                event.preventDefault(); // Ngăn hành động mặc định xảy ra
-                                                                let documentId = this.getAttribute('data-id');
-
-                                                                // Hiển thị hộp thoại xác nhận với SweetAlert
-                                                                Swal.fire({
-                                                                    title: 'Xác nhận xóa',
-                                                                    text: "Bạn có chắc chắn muốn xóa tài liệu này không?",
-                                                                    icon: 'warning',
-                                                                    showCancelButton: true,
-                                                                    confirmButtonColor: '#3085d6',
-                                                                    cancelButtonColor: '#d33',
-                                                                    confirmButtonText: 'Có, xóa!',
-                                                                    cancelButtonText: 'Không'
-                                                                }).then((result) => {
-                                                                    if (result.isConfirmed) {
-                                                                        // Nếu người dùng chọn "Có", chuyển hướng tới trang xử lý PHP
-                                                                        window.location.href = 'delete_document.php?id=' + documentId;
-                                                                    }
-                                                                });
-                                                            });
-                                                        });
-                                                    </script>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr><td colspan="4" class="text-center">Không tìm thấy kết quả nào.</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                    <div class="col-md-3">
+                        <div class="card bg-success text-white shadow-sm h-100 border-0 rounded-3">
+                            <div class="card-body d-flex align-items-center">
+                                <div class="fs-1 me-3"><i class="fas fa-check-circle"></i></div>
+                                <div>
+                                    <h6 class="card-title mb-0 text-white-50">Còn hiệu lực</h6>
+                                    <h2 class="mb-0 fw-bold"><?php echo h($valid_docs); ?></h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-warning text-dark shadow-sm h-100 border-0 rounded-3">
+                            <div class="card-body d-flex align-items-center">
+                                <div class="fs-1 me-3"><i class="fas fa-star"></i></div>
+                                <div>
+                                    <h6 class="card-title mb-0 text-black-50">Quan trọng (Yêu thích)</h6>
+                                    <h2 class="mb-0 fw-bold"><?php echo h($favorite_docs); ?></h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-danger text-white shadow-sm h-100 border-0 rounded-3">
+                            <div class="card-body d-flex align-items-center">
+                                <div class="fs-1 me-3"><i class="fas fa-lock"></i></div>
+                                <div>
+                                    <h6 class="card-title mb-0 text-white-50">Văn bản Mật</h6>
+                                    <h2 class="mb-0 fw-bold"><?php echo h($secret_docs); ?></h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Phân trang -->
-                <?php
-                $total_pages = ceil($total_rows / $items_per_page);
-                if ($total_pages > 1):
-                    $range = 2; // Số trang hiển thị trước và sau trang hiện tại
-                    $start = max(1, $page - $range);
-                    $end = min($total_pages, $page + $range);
-                ?>
-                <nav>
-                    <ul class="pagination justify-content-center">
-                        <!-- Trang đầu & Trang trước -->
-                        <?php 
-                        if ($page > 1): ?>
-                            <li>
-                                <a class="page-link" href="?page=1&search_query=<?php echo urlencode($search_query) ?>&search_column=<?php echo urlencode($search_column) ?>&document_type_id=<?php echo urlencode($document_type_filter) ?>">&laquo;</a>
-                            </li>
-                            <li>
-                                <a class="page-link" href="?page=<?php echo $page - 1; ?>&search_query=<?php echo htmlspecialchars($search_query); ?>&search_column=<?php echo htmlspecialchars($search_column); ?>&document_type_id=<?php echo htmlspecialchars($document_type_filter);?>">&lsaquo;</a>
-                            </li>
-                        <?php endif; ?>
-                        
-                        <!-- Các trang -->
-                        <?php 
-                        // Tính toán lại phạm vi hiển thị trang
-                        $start = max(1, $page - $range);
-                        $end = min($total_pages, $start + 4); 
+                <!-- HÀNG 2: BIỂU ĐỒ THỐNG KÊ -->
+                <div class="row mb-4">
+                    <!-- Biểu đồ tròn: Hiệu lực -->
+                    <div class="col-md-5">
+                        <div class="card shadow-sm border-0 h-100 rounded-3">
+                            <div class="card-header bg-white border-bottom-0 pt-3 pb-0">
+                                <h6 class="fw-bold text-secondary">Tỷ lệ tình trạng hiệu lực</h6>
+                            </div>
+                            <div class="card-body">
+                                <div style="height: 250px; display: flex; justify-content: center;">
+                                    <canvas id="statusChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Biểu đồ cột: Loại văn bản -->
+                    <div class="col-md-7">
+                        <div class="card shadow-sm border-0 h-100 rounded-3">
+                            <div class="card-header bg-white border-bottom-0 pt-3 pb-0">
+                                <h6 class="fw-bold text-secondary">Top 5 loại văn bản nhiều nhất</h6>
+                            </div>
+                            <div class="card-body">
+                                <div style="height: 250px;">
+                                    <canvas id="typeChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                        // Điều chỉnh bắt đầu nếu cần
-                        if ($end - $start < 4) {
-                            $start = max(1, $end - 4); // Đảm bảo có 5 trang
-                        }
-
-                        for ($i = $start; $i <= $end; $i++): ?>
-                            <li class="page-item <?php echo ($i == $page) ? 'active' : ''; ?>">
-                                <?php if ($i == $page): ?>
-                                    <?php echo $i; ?>
-                                <?php else: ?>
-                                    <a class="page-link" href="?page=<?php echo $i; ?>&search_query=<?php echo htmlspecialchars($search_query); ?>&search_column=<?php echo htmlspecialchars($search_column); ?>&document_type_id=<?php echo htmlspecialchars($document_type_filter); ?>">
-                                        <?php echo $i; ?>
-                                    </a>
-                                <?php endif; ?>
-                            </li>
-                        <?php endfor; ?>
-                        
-                        <!-- Trang sau & Trang cuối -->
-                        <?php if ($page < $total_pages): ?>
-                            <li>
-                                <a class="page-link" href="?page=<?php echo $page + 1; ?>&search_query=<?php echo htmlspecialchars($search_query); ?>&search_column=<?php echo htmlspecialchars($search_column); ?>&document_type_id=<?php echo htmlspecialchars($document_type_filter); ?>">&rsaquo;</a>
-                            </li>
-                            <li>
-                                <a class="page-link" href="?page=<?php echo $total_pages; ?>&search_query=<?php echo urlencode($search_query); ?>&search_column=<?php echo urlencode($search_column); ?>&document_type_id=<?php echo urlencode($document_type_filter); ?>">&raquo;</a>
-                            </li>
-                        <?php endif; ?>
-                    </ul>
-                </nav>
-                <?php endif; ?>
+                <!-- HÀNG 3: VĂN BẢN MỚI THÊM -->
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center pt-3 pb-2">
+                        <h6 class="fw-bold text-secondary mb-0">Văn bản mới cập nhật gần đây</h6>
+                        <a href="documents.php" class="btn btn-sm btn-outline-danger">Xem tất cả <i class="fas fa-arrow-right ms-1"></i></a>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-3">Số ký hiệu</th>
+                                        <th>Trích yếu</th>
+                                        <th>Ngày ban hành</th>
+                                        <th>Tình trạng</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($recent_docs as $doc): ?>
+                                    <tr>
+                                        <td class="ps-3 fw-semibold">
+                                            <a href="view_document.php?id=<?php echo $doc['id']; ?>" class="text-decoration-none text-dark">
+                                                <?php echo h($doc['document_number']); ?>
+                                            </a>
+                                        </td>
+                                        <td class="text-truncate" style="max-width: 350px;" title="<?php echo h($doc['content']); ?>">
+                                            <?php echo h($doc['content']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo (!empty($doc['issued_date']) && $doc['issued_date'] != '0000-00-00') ? date('d/m/Y', strtotime($doc['issued_date'])) : ''; ?>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-<?php echo ($doc['status'] == 'Còn hiệu lực') ? 'success' : (($doc['status'] == 'Hết hiệu lực') ? 'secondary' : 'warning text-dark'); ?>">
+                                                <?php echo h($doc['status']); ?>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                    <?php if(count($recent_docs) == 0): ?>
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-3">Chưa có dữ liệu</td>
+                                    </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Vẽ biểu đồ Tròn (Doughnut) cho Tình trạng hiệu lực
+    const statusCanvas = document.getElementById('statusChart');
+    if (statusCanvas) {
+        const ctxStatus = statusCanvas.getContext('2d');
+        new Chart(ctxStatus, {
+            type: 'doughnut',
+            data: {
+                labels: <?php echo json_encode($chart_status_labels); ?>,
+                datasets: [{
+                    data: <?php echo json_encode($chart_status_data); ?>,
+                    backgroundColor: <?php echo json_encode($chart_status_colors); ?>,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' }
+                }
+            }
+        });
+    }
+
+    // 2. Vẽ biểu đồ Cột (Bar) cho Loại văn bản
+    const typeCanvas = document.getElementById('typeChart');
+    if (typeCanvas) {
+        const ctxType = typeCanvas.getContext('2d');
+        new Chart(ctxType, {
+            type: 'bar',
+            data: {
+                labels: <?php echo json_encode($chart_type_labels); ?>,
+                datasets: [{
+                    label: 'Số lượng văn bản',
+                    data: <?php echo json_encode($chart_type_data); ?>,
+                    backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+
 <?php include 'footer.php'; ?>

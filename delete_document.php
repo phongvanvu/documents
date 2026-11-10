@@ -1,71 +1,66 @@
 <?php
-// Khởi động session
 session_start();
-
-// Kiểm tra nếu người dùng chưa đăng nhập
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
-}
-
-// Kiểm tra xem người dùng có phải admin hoặc có quyền xóa tài liệu không
-if ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'editor') {
-    echo "Bạn không có quyền xóa tài liệu.";
-    exit;
-}
-
-// Kết nối đến cơ sở dữ liệu
 include 'db.php';
 
-// Kiểm tra nếu ID tài liệu được gửi qua URL
-if (isset($_GET['id'])) {
-    $document_id = intval($_GET['id']);
+include_once 'auth.php';
+require_permission('documents.delete');
 
-    // Truy vấn để kiểm tra văn bản có tồn tại không
-    $sql = "SELECT document_number FROM documents WHERE id = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param('i', $document_id);
-    $stmt->execute();
-    $stmt->store_result();
-    
-    if ($stmt->num_rows === 0) {
-        // Văn bản không tồn tại
-        echo "Văn bản không tồn tại.";
-        $stmt->close();
-        $conn->close();
-        exit();
-    }
-
-    $stmt->bind_result($document_number);
-    $stmt->fetch();
-    $stmt->close();
-
-
-    // Xóa tài liệu khỏi cơ sở dữ liệu
-    $stmt = $conn->prepare("DELETE FROM documents WHERE id = ?");
-    $stmt->bind_param("i", $document_id);
-    
-    if ($stmt->execute()) {
-        // Ghi lại log hành động xóa
-        $user_id = $_SESSION['user_id'];
-        $action = "Xóa văn bản số hiệu: " . $document_number;
-        $log_stmt = $conn->prepare("INSERT INTO logs (user_id, action) VALUES (?, ?)");
-        $log_stmt->bind_param("is", $user_id, $action);
-        $log_stmt->execute();
-        $log_stmt->close();
-
-        // Chuyển hướng về trang dashboard với thông báo thành công
-        $_SESSION['success_message'] = "Tài liệu đã được xóa thành công.";
-        header('Location: dashboard.php');
-        exit;
-    } else {
-        echo "Có lỗi xảy ra khi xóa tài liệu.";
-    }
-    $stmt->close();
-} else {
-    echo "Không có ID tài liệu nào được cung cấp.";
+// 1. Kiểm tra quyền truy cập
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'] ?? '', ['admin', 'editor'], true)) {
+    $_SESSION['flash_error'] = "Bạn không có quyền thực hiện thao tác xóa.";
+    header('Location: documents.php');
+    exit;
 }
 
-// Đóng kết nối cơ sở dữ liệu
-$conn->close();
-?>
+$document_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+
+if (!$document_id) {
+    $_SESSION['flash_error'] = "ID văn bản không hợp lệ.";
+    header('Location: documents.php');
+    exit;
+}
+
+// 2. Lấy thông tin văn bản để ghi Log
+$stmt = $conn->prepare("SELECT document_number FROM documents WHERE id = ? AND deleted_at IS NULL");
+$stmt->bind_param('i', $document_id);
+$stmt->execute();
+$document = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$document) {
+    $_SESSION['flash_error'] = "Văn bản không tồn tại hoặc đã nằm trong thùng rác.";
+    header('Location: documents.php');
+    exit;
+}
+
+$doc_num = $document['document_number'] ?? '';
+
+// 3. Tiến hành XÓA MỀM (Cập nhật cột deleted_at)
+// Không xóa file vật lý, không xóa liên kết phụ lục lúc này
+$stmt_del = $conn->prepare("UPDATE documents SET deleted_at = NOW() WHERE id = ?");
+$stmt_del->bind_param("i", $document_id);
+
+if ($stmt_del->execute()) {
+    $stmt_del->close();
+
+    // 4. Ghi Log hành động
+    $user_id = (int)$_SESSION['user_id'];
+    $action = "Chuyển vào thùng rác VB số: " . $doc_num;
+    
+    // Sử dụng try-catch đề phòng bảng logs chưa được tạo chuẩn
+    try {
+        $log_stmt = $conn->prepare("INSERT INTO logs (user_id, action) VALUES (?, ?)");
+        if ($log_stmt) {
+            $log_stmt->bind_param("is", $user_id, $action);
+            $log_stmt->execute();
+            $log_stmt->close();
+        }
+    } catch (Exception $e) {}
+
+    $_SESSION['flash_msg'] = "Đã chuyển văn bản " . $doc_num . " vào thùng rác!";
+} else {
+    $_SESSION['flash_error'] = "Có lỗi xảy ra khi xóa văn bản.";
+}
+
+header('Location: documents.php');
+exit;
