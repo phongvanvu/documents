@@ -65,7 +65,7 @@
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Ngày ban hành <span class="text-danger">*</span></label>
                             <input type="date" name="issued_date" class="form-control @error('issued_date') is-invalid @enderror"
-                                   value="{{ old('issued_date', date('Y-m-d')) }}" required>
+                                   value="{{ old('issued_date') }}" required>
                             @error('issued_date')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
