@@ -1,0 +1,237 @@
+/* =========================================
+   1. ĐỊNH NGHĨA BIẾN & THIẾT LẬP CHUNG
+========================================= */
+:root {
+    --system-red: #dc3545;       /* Đỏ chủ đạo hệ thống (Sidebar, Tiêu đề cảnh báo) */
+    --system-dark-red: #b21f2d;  /* Đỏ sẫm khi hover */
+    --system-blue: #0d6efd;      /* Xanh dương chuyên nghiệp cho nút bấm chính (Primary) */
+    --system-dark-blue: #0b5ed7; /* Xanh dương sẫm khi hover */
+    --bg-light: #f8f9fa;         /* Nền xám nhạt dịu mắt */
+}
+
+body {
+    background-color: var(--bg-light);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14px;
+    margin: 0;
+    overflow-x: hidden;
+}
+
+/* ĐỒNG BỘ: Giữ nguyên cơ chế Flexbox để bổ trợ cho nút đẩy mt-auto của chân trang */
+.wrapper {
+    display: flex !important; 
+    width: 100%;
+    min-height: 100vh;
+    flex-direction: row;
+}
+
+/* =========================================
+   2. BỐ CỤC SIDEBAR CỐ ĐỊNH & VÙNG NỘI DUNG
+========================================= */
+#sidebar {
+    position: fixed !important;
+    top: 0; 
+    left: 0;
+    height: 100vh;
+    width: 250px !important;
+    background-color: var(--system-red) !important;
+    z-index: 1050;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    overflow-x: hidden;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+#content {
+    margin-left: 250px !important;
+    width: calc(100% - 250px) !important;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column; /* Hỗ trợ ép dính Footer xuống đáy màn hình */
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* =========================================
+   3. CƠ CHẾ THU GỌN SIDEBAR THÔNG MINH (CHỐNG GIẬT)
+========================================= */
+html.sidebar-collapsed #sidebar {
+    width: 80px !important;
+}
+
+/* SỬA LỖI GIẬT DIỆN TÍCH: Ép trọng số tối cao bằng !important cho trạng thái đóng */
+html.sidebar-collapsed #content {
+    margin-left: 80px !important;
+    width: calc(100% - 80px) !important;
+}
+
+html.sidebar-collapsed #sidebar .nav-text,
+html.sidebar-collapsed #sidebar small,
+html.sidebar-collapsed #sidebar hr {
+    display: none !important;
+}
+
+html.sidebar-collapsed #sidebar .nav-item a {
+    justify-content: center !important;
+    padding: 0 !important;
+    width: 48px !important;
+    height: 48px !important;
+    margin: 4px auto;
+    display: flex;
+    align-items: center;
+    border-radius: 12px !important;
+}
+
+html.sidebar-collapsed #sidebar .nav-item a i {
+    margin-right: 0 !important;
+    font-size: 1.3rem !important;
+}
+
+html.sidebar-collapsed #sidebar .avatar {
+    width: 45px !important;
+    height: 45px !important;
+}
+
+/* Trạng thái menu đang mở */
+#sidebar .nav-link {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    margin: 2px 10px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+#sidebar .nav-link:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+}
+
+/* Nâng cấp thẩm mỹ cho nút Menu đang được kích hoạt (Active) */
+#sidebar .nav-link.active {
+    background-color: #ffffff !important;
+    color: var(--system-red) !important;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#sidebar .nav-link.active i {
+    color: var(--system-red) !important;
+}
+
+/* Quản lý hiển thị Avatar */
+.avatar {
+    width: 65px;
+    height: 65px;
+    object-fit: cover;
+    aspect-ratio: 1 / 1;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+/* =========================================
+   4. CHUẨN HÓA THẨM MỸ FORM & NÚT BẤM (UX)
+========================================= */
+.form-control, .form-select {
+    border-radius: 8px !important;
+    border: 1px solid #ced4da;
+    padding: 0.45rem 0.9rem;
+    font-weight: 500;
+}
+
+/* Hiệu ứng Focus viền đỏ sang trọng thay vì viền xanh mặc định của trình duyệt */
+.form-control:focus, .form-select:focus {
+    border-color: var(--system-red) !important;
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25) !important;
+}
+
+.btn {
+    border-radius: 8px !important;
+    padding: 0.45rem 1.2rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+/* ĐỒNG BỘ UX: Phân định rõ ràng màu sắc chức năng nút bấm */
+.btn-primary {
+    background-color: var(--system-blue) !important;
+    border-color: var(--system-blue) !important;
+    color: #white !important;
+}
+.btn-primary:hover {
+    background-color: var(--system-dark-blue) !important;
+    border-color: var(--system-dark-blue) !important;
+}
+
+.btn-danger {
+    background-color: var(--system-red) !important;
+    border-color: var(--system-red) !important;
+}
+.btn-danger:hover {
+    background-color: var(--system-dark-red) !important;
+    border-color: var(--system-dark-red) !important;
+}
+
+/* =========================================
+   5. THIẾT KẾ BẢNG DỮ LIỆU & PHÂN TRANG
+========================================= */
+.table {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.table thead th {
+    background-color: #f1f3f5 !important; /* Chuyển nền Th về xám dịu để làm nổi bật chữ văn bản */
+    color: #495057 !important;
+    font-weight: 700;
+    text-uppercase: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    padding: 12px 10px;
+    border-bottom: 2px solid #dee2e6 !important;
+}
+
+.table tbody td {
+    padding: 14px 10px;
+    color: #333333;
+}
+
+/* Thiết kế lại thanh Phân Trang tinh tế */
+.pagination .page-link {
+    border-radius: 6px !important;
+    margin: 0 3px;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.pagination .page-link:hover {
+    background-color: rgba(220, 53, 69, 0.08);
+    color: var(--system-dark-red);
+    border-color: #dee2e6;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--system-red) !important;
+    border-color: var(--system-red) !important;
+    color: white !important;
+    box-shadow: 0 3px 6px rgba(220, 53, 69, 0.2);
+}
+
+/* =========================================
+   6. HỖ TRỢ HIỂN THỊ TRÊN DI ĐỘNG (RESPONSIVE)
+========================================= */
+@media (max-width: 768px) {
+    #sidebar {
+        width: 0 !important; /* Ẩn sidebar trên thiết bị di động màn hình nhỏ */
+    }
+    #content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    html.sidebar-collapsed #sidebar {
+        width: 240px !important; /* Trên mobile, bấm hamburger sẽ bung menu như ngăn kéo out-canvas */
+    }
+    html.sidebar-collapsed #content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+}

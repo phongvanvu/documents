@@ -1,24 +1,40 @@
-# Dữ liệu tài liệu tải lên (loại trừ toàn bộ tệp và thư mục con trong uploads/)
+*.log
+.DS_Store
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.codex
+/.cursor/
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+_ide_helper.php
+Homestead.json
+Homestead.yaml
+Thumbs.db
+
+# Dữ liệu tài liệu tải lên & junction
 uploads/*
 !uploads/.htaccess
 !uploads/**/.gitkeep
+/public/uploads
+/public/assets
 
-# Bản sao lưu CSDL (chứa dữ liệu nhạy cảm)
+# Bản sao lưu CSDL
 backups/*
 !backups/.gitkeep
 *.sql
 *.sql.gz
-
-# Thư viện phụ thuộc bên thứ 3
-vendor/
-
-# Tệp tạm thời, nhật ký và hệ điều hành
-*.tmp
-*.log
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Cấu hình IDE / Trình soạn thảo
-.vscode/
-.idea/
