@@ -10,6 +10,56 @@ use Illuminate\Support\Facades\DB;
 
 class CategoryController extends Controller
 {
+    /**
+     * Lưu chung danh mục (Loại văn bản / Cơ quan ban hành), hỗ trợ cả submit form và AJAX JSON.
+     */
+    private function storeCategoryItem(
+        Request $request,
+        string $modelClass,
+        string $table,
+        string $column,
+        string $label,
+        string $responseKey
+    ) {
+        if (!auth()->user()?->isEditor()) {
+            $msg = "Bạn không có quyền thêm {$label}.";
+            if ($request->expectsJson()) {
+                return response()->json(['status' => 'error', 'message' => $msg], 403);
+            }
+            abort(403, $msg);
+        }
+
+        $validated = $request->validate([
+            $column => "required|string|max:255|unique:{$table},{$column}",
+        ], [
+            "{$column}.required" => "Vui lòng nhập tên {$label}.",
+            "{$column}.max" => "Tên {$label} tối đa 255 ký tự.",
+            "{$column}.unique" => ucfirst($label) . ' này đã tồn tại trong hệ thống.',
+        ]);
+
+        $record = $modelClass::create($validated);
+        log_activity("Thêm {$label}: {$record->$column}");
+
+        $successMsg = "Đã thêm {$label} mới.";
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => $successMsg,
+                'item' => [
+                    'id' => $record->id,
+                    'name' => $record->$column,
+                ],
+                $responseKey => [
+                    'id' => $record->id,
+                    $column => $record->$column,
+                ],
+            ], 201);
+        }
+
+        return back()->with('success', $successMsg);
+    }
+
     // === LOẠI VĂN BẢN ===
     public function indexTypes()
     {
@@ -19,39 +69,14 @@ class CategoryController extends Controller
 
     public function storeType(Request $request)
     {
-        if (!auth()->user()?->isEditor()) {
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Bạn không có quyền thêm loại văn bản.',
-                ], 403);
-            }
-            abort(403, 'Bạn không có quyền thêm loại văn bản.');
-        }
-
-        $validated = $request->validate([
-            'type_name' => 'required|string|max:255|unique:document_types,type_name',
-        ], [
-            'type_name.required' => 'Vui lòng nhập tên loại văn bản.',
-            'type_name.max' => 'Tên loại văn bản tối đa 255 ký tự.',
-            'type_name.unique' => 'Loại văn bản này đã tồn tại trong hệ thống.',
-        ]);
-
-        $type = DocumentType::create($validated);
-        log_activity("Thêm loại văn bản: {$type->type_name}");
-
-        if ($request->expectsJson()) {
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Đã thêm loại văn bản mới.',
-                'type' => [
-                    'id' => $type->id,
-                    'type_name' => $type->type_name,
-                ],
-            ], 201);
-        }
-
-        return back()->with('success', 'Đã thêm loại văn bản mới.');
+        return $this->storeCategoryItem(
+            $request,
+            DocumentType::class,
+            'document_types',
+            'type_name',
+            'loại văn bản',
+            'type'
+        );
     }
 
     public function updateType(Request $request, $id)
@@ -92,14 +117,14 @@ class CategoryController extends Controller
 
     public function storeAuthority(Request $request)
     {
-        $validated = $request->validate([
-            'authority_name' => 'required|string|max:255|unique:issuing_authorities,authority_name',
-        ]);
-
-        IssuingAuthority::create($validated);
-        log_activity("Thêm cơ quan ban hành: {$validated['authority_name']}");
-
-        return back()->with('success', 'Đã thêm cơ quan ban hành mới.');
+        return $this->storeCategoryItem(
+            $request,
+            IssuingAuthority::class,
+            'issuing_authorities',
+            'authority_name',
+            'cơ quan ban hành',
+            'authority'
+        );
     }
 
     public function updateAuthority(Request $request, $id)

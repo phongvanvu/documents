@@ -127,16 +127,24 @@
                         <!-- Cơ quan ban hành -->
                         <div class="col-md-3">
                             <label class="form-label fw-semibold" for="authority_id">Cơ quan ban hành <span class="text-danger">*</span></label>
-                            <select name="authority_id" id="authority_id"
-                                    class="form-select searchable-select @error('authority_id') is-invalid @enderror"
-                                    data-placeholder="-- Chọn hoặc gõ tìm cơ quan --"
-                                    data-search-placeholder="Gõ để tìm cơ quan..."
-                                    required>
-                                <option value="">-- Chọn cơ quan --</option>
-                                @foreach($authorities as $a)
-                                    <option value="{{ $a->id }}" {{ old('authority_id') == $a->id ? 'selected' : '' }}>{{ $a->authority_name }}</option>
-                                @endforeach
-                            </select>
+                            <div class="d-flex gap-1 align-items-start">
+                                <div class="flex-grow-1 min-w-0">
+                                    <select name="authority_id" id="authority_id"
+                                            class="form-select searchable-select @error('authority_id') is-invalid @enderror"
+                                            data-placeholder="-- Chọn hoặc gõ tìm cơ quan --"
+                                            data-search-placeholder="Gõ để tìm cơ quan..."
+                                            required>
+                                        <option value="">-- Chọn cơ quan --</option>
+                                        @foreach($authorities as $a)
+                                            <option value="{{ $a->id }}" {{ old('authority_id') == $a->id ? 'selected' : '' }}>{{ $a->authority_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-outline-danger flex-shrink-0" id="btnOpenAddAuthorityModal"
+                                        title="Thêm cơ quan ban hành mới" aria-label="Thêm cơ quan ban hành mới">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                             @error('authority_id')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
@@ -175,8 +183,8 @@
                     <div class="row g-3 mb-3">
                         <!-- Ngày ban hành -->
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Ngày ban hành <span class="text-danger">*</span></label>
-                            <input type="date" name="issued_date" class="form-control @error('issued_date') is-invalid @enderror"
+                            <label class="form-label fw-semibold" for="issued_date">Ngày ban hành <span class="text-danger">*</span></label>
+                            <input type="date" name="issued_date" id="issued_date" class="form-control @error('issued_date') is-invalid @enderror"
                                    value="{{ old('issued_date') }}" required>
                             @error('issued_date')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -185,8 +193,8 @@
 
                         <!-- Ngày có hiệu lực -->
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Ngày có hiệu lực</label>
-                            <input type="date" name="effective_date" class="form-control @error('effective_date') is-invalid @enderror"
+                            <label class="form-label fw-semibold" for="effective_date">Ngày có hiệu lực</label>
+                            <input type="date" name="effective_date" id="effective_date" class="form-control @error('effective_date') is-invalid @enderror"
                                    value="{{ old('effective_date') }}">
                             @error('effective_date')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -287,6 +295,38 @@
                     <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Hủy</button>
                     <button type="submit" class="btn btn-danger btn-sm px-3 fw-bold" id="btnSubmitAddType">
                         <i class="fas fa-save me-1"></i>Lưu loại văn bản
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL THÊM CƠ QUAN BAN HÀNH MỚI -->
+<div class="modal fade" id="modalAddAuthority" tabindex="-1" aria-labelledby="modalAddAuthorityLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header bg-danger text-white">
+                <h6 class="modal-title fw-bold" id="modalAddAuthorityLabel">
+                    <i class="fas fa-building me-2"></i>Thêm cơ quan ban hành mới
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <form id="formAddAuthority">
+                <div class="modal-body p-4">
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold small" for="newAuthorityNameInput">
+                            Tên cơ quan ban hành <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" name="authority_name" id="newAuthorityNameInput" class="form-control"
+                               placeholder="VD: Bộ Công an, Bộ Y tế, Chính phủ..." maxlength="255" autocomplete="off" required>
+                        <div class="invalid-feedback" id="newAuthorityNameError"></div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-danger btn-sm px-3 fw-bold" id="btnSubmitAddAuthority">
+                        <i class="fas fa-save me-1"></i>Lưu cơ quan ban hành
                     </button>
                 </div>
             </form>
@@ -431,7 +471,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 emptyDiv.textContent = 'Không tìm thấy kết quả phù hợp.';
                 list.appendChild(emptyDiv);
 
-                if (selectEl.id === 'document_type_id' && filterTerm.trim() !== '') {
+                if (quickAddHandlers[selectEl.id] && filterTerm.trim() !== '') {
                     var quickAddBtn = document.createElement('button');
                     quickAddBtn.type = 'button';
                     quickAddBtn.className = 'btn btn-sm btn-outline-danger w-100 mt-1 fw-semibold';
@@ -440,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         e.preventDefault();
                         e.stopPropagation();
                         closeMenu(false);
-                        openAddTypeModal(filterTerm.trim());
+                        quickAddHandlers[selectEl.id](filterTerm.trim());
                     });
                     list.appendChild(quickAddBtn);
                 }
@@ -576,109 +616,150 @@ document.addEventListener('DOMContentLoaded', function() {
         syncLabel();
     }
 
-    var modalAddTypeEl = document.getElementById('modalAddType');
-    var formAddType = document.getElementById('formAddType');
-    var newTypeNameInput = document.getElementById('newTypeNameInput');
-    var newTypeNameError = document.getElementById('newTypeNameError');
-    var btnSubmitAddType = document.getElementById('btnSubmitAddType');
-    var btnOpenAddTypeModal = document.getElementById('btnOpenAddTypeModal');
-    var docTypeSelect = document.getElementById('document_type_id');
+    var quickAddHandlers = {};
 
-    function resetAddTypeError() {
-        if (newTypeNameInput) newTypeNameInput.classList.remove('is-invalid');
-        if (newTypeNameError) newTypeNameError.textContent = '';
-    }
+    function initQuickAddCategory(cfg) {
+        var modalEl = document.getElementById(cfg.modalId);
+        var formEl = document.getElementById(cfg.formId);
+        var inputEl = document.getElementById(cfg.inputId);
+        var errorEl = document.getElementById(cfg.errorId);
+        var submitBtn = document.getElementById(cfg.submitBtnId);
+        var openBtn = document.getElementById(cfg.openBtnId);
+        var targetSelect = document.getElementById(cfg.selectId);
 
-    function openAddTypeModal(prefillName) {
-        if (!modalAddTypeEl) return;
-        resetAddTypeError();
-        if (newTypeNameInput) {
-            newTypeNameInput.value = prefillName || '';
+        function resetError() {
+            if (inputEl) inputEl.classList.remove('is-invalid');
+            if (errorEl) errorEl.textContent = '';
         }
-        bootstrap.Modal.getOrCreateInstance(modalAddTypeEl).show();
-    }
 
-    if (modalAddTypeEl) {
-        modalAddTypeEl.addEventListener('shown.bs.modal', function() {
-            if (newTypeNameInput) {
-                newTypeNameInput.focus();
-                newTypeNameInput.select();
+        function openModal(prefillName) {
+            if (!modalEl) return;
+            resetError();
+            if (inputEl) {
+                inputEl.value = prefillName || '';
             }
-        });
-    }
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
 
-    if (btnOpenAddTypeModal) {
-        btnOpenAddTypeModal.addEventListener('click', function() {
-            openAddTypeModal('');
-        });
-    }
+        quickAddHandlers[cfg.selectId] = openModal;
 
-    if (formAddType) {
-        formAddType.addEventListener('submit', function(e) {
-            e.preventDefault();
-            resetAddTypeError();
-
-            var typeName = newTypeNameInput ? newTypeNameInput.value.trim() : '';
-            if (!typeName) {
-                newTypeNameInput.classList.add('is-invalid');
-                newTypeNameError.textContent = 'Vui lòng nhập tên loại văn bản.';
-                return;
-            }
-
-            var origBtnHtml = btnSubmitAddType.innerHTML;
-            btnSubmitAddType.disabled = true;
-            btnSubmitAddType.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang lưu...';
-
-            fetch('{{ route("categories.types.store") }}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ type_name: typeName })
-            })
-            .then(function(res) {
-                return res.json().then(function(data) {
-                    return { ok: res.ok, status: res.status, data: data };
-                });
-            })
-            .then(function(result) {
-                if (result.ok && result.data.status === 'success' && result.data.type) {
-                    if (docTypeSelect && docTypeSelect._searchableSelect) {
-                        docTypeSelect._searchableSelect.addAndSelect(result.data.type.id, result.data.type.type_name);
-                    }
-                    formAddType.reset();
-                    bootstrap.Modal.getOrCreateInstance(modalAddTypeEl).hide();
-
-                    if (typeof Swal !== 'undefined') {
-                        Swal.fire({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'success',
-                            title: result.data.message || 'Đã thêm loại văn bản mới!',
-                            showConfirmButton: false,
-                            timer: 2000
-                        });
-                    }
-                } else {
-                    var errMsg = (result.data && result.data.errors && result.data.errors.type_name && result.data.errors.type_name[0])
-                        || (result.data && result.data.message)
-                        || 'Không thể thêm loại văn bản mới.';
-                    newTypeNameInput.classList.add('is-invalid');
-                    newTypeNameError.textContent = errMsg;
+        if (modalEl) {
+            modalEl.addEventListener('shown.bs.modal', function() {
+                if (inputEl) {
+                    inputEl.focus();
+                    inputEl.select();
                 }
-            })
-            .catch(function() {
-                newTypeNameInput.classList.add('is-invalid');
-                newTypeNameError.textContent = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
-            })
-            .finally(function() {
-                btnSubmitAddType.disabled = false;
-                btnSubmitAddType.innerHTML = origBtnHtml;
             });
-        });
+        }
+
+        if (openBtn) {
+            openBtn.addEventListener('click', function() {
+                openModal('');
+            });
+        }
+
+        if (formEl) {
+            formEl.addEventListener('submit', function(e) {
+                e.preventDefault();
+                resetError();
+
+                var value = inputEl ? inputEl.value.trim() : '';
+                if (!value) {
+                    inputEl.classList.add('is-invalid');
+                    errorEl.textContent = cfg.emptyMessage;
+                    return;
+                }
+
+                var origBtnHtml = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang lưu...';
+
+                var payload = {};
+                payload[cfg.fieldName] = value;
+
+                fetch(cfg.url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(function(res) {
+                    return res.json().then(function(data) {
+                        return { ok: res.ok, status: res.status, data: data };
+                    });
+                })
+                .then(function(result) {
+                    var addedItem = result.data && result.data.item;
+                    if (result.ok && result.data.status === 'success' && addedItem) {
+                        if (targetSelect && targetSelect._searchableSelect) {
+                            targetSelect._searchableSelect.addAndSelect(addedItem.id, addedItem.name);
+                        }
+                        formEl.reset();
+                        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                toast: true,
+                                position: 'top-end',
+                                icon: 'success',
+                                title: result.data.message || cfg.successFallback,
+                                showConfirmButton: false,
+                                timer: 2000
+                            });
+                        }
+                    } else {
+                        var fieldErrors = result.data && result.data.errors && result.data.errors[cfg.fieldName];
+                        var errMsg = (fieldErrors && fieldErrors[0])
+                            || (result.data && result.data.message)
+                            || cfg.errorFallback;
+                        inputEl.classList.add('is-invalid');
+                        errorEl.textContent = errMsg;
+                    }
+                })
+                .catch(function() {
+                    inputEl.classList.add('is-invalid');
+                    errorEl.textContent = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+                })
+                .finally(function() {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = origBtnHtml;
+                });
+            });
+        }
     }
+
+    initQuickAddCategory({
+        modalId: 'modalAddType',
+        formId: 'formAddType',
+        inputId: 'newTypeNameInput',
+        errorId: 'newTypeNameError',
+        submitBtnId: 'btnSubmitAddType',
+        openBtnId: 'btnOpenAddTypeModal',
+        selectId: 'document_type_id',
+        fieldName: 'type_name',
+        url: '{{ route("categories.types.store") }}',
+        emptyMessage: 'Vui lòng nhập tên loại văn bản.',
+        successFallback: 'Đã thêm loại văn bản mới!',
+        errorFallback: 'Không thể thêm loại văn bản mới.'
+    });
+
+    initQuickAddCategory({
+        modalId: 'modalAddAuthority',
+        formId: 'formAddAuthority',
+        inputId: 'newAuthorityNameInput',
+        errorId: 'newAuthorityNameError',
+        submitBtnId: 'btnSubmitAddAuthority',
+        openBtnId: 'btnOpenAddAuthorityModal',
+        selectId: 'authority_id',
+        fieldName: 'authority_name',
+        url: '{{ route("categories.authorities.store") }}',
+        emptyMessage: 'Vui lòng nhập tên cơ quan ban hành.',
+        successFallback: 'Đã thêm cơ quan ban hành mới!',
+        errorFallback: 'Không thể thêm cơ quan ban hành mới.'
+    });
 
     document.querySelectorAll('select.searchable-select').forEach(makeSearchableSelect);
 
@@ -810,6 +891,36 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             duplicateBox.classList.add('d-none');
         });
+    }
+
+    // =========================================================================
+    // 3. TỰ ĐỘNG ĐIỀN NGÀY CÓ HIỆU LỰC MẶC ĐỊNH = NGÀY BAN HÀNH
+    // =========================================================================
+    var issuedDateInput = document.getElementById('issued_date');
+    var effectiveDateInput = document.getElementById('effective_date');
+
+    if (issuedDateInput && effectiveDateInput) {
+        var effectiveManuallyEdited = Boolean(
+            effectiveDateInput.value && effectiveDateInput.value !== issuedDateInput.value
+        );
+
+        effectiveDateInput.addEventListener('change', function() {
+            effectiveManuallyEdited = Boolean(this.value && this.value !== issuedDateInput.value);
+        });
+
+        function syncEffectiveFromIssued(requireFourDigitYear) {
+            var val = issuedDateInput.value;
+            if (!val || !/^\d{4}-\d{2}-\d{2}$/.test(val)) return;
+            if (requireFourDigitYear && parseInt(val.slice(0, 4), 10) < 1000) return;
+
+            if (!effectiveDateInput.value || !effectiveManuallyEdited) {
+                effectiveDateInput.value = val;
+            }
+        }
+
+        issuedDateInput.addEventListener('input', function() { syncEffectiveFromIssued(true); });
+        issuedDateInput.addEventListener('change', function() { syncEffectiveFromIssued(false); });
+        issuedDateInput.addEventListener('blur', function() { syncEffectiveFromIssued(false); });
     }
 });
 </script>
