@@ -19,12 +19,37 @@ class CategoryController extends Controller
 
     public function storeType(Request $request)
     {
+        if (!auth()->user()?->isEditor()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Bạn không có quyền thêm loại văn bản.',
+                ], 403);
+            }
+            abort(403, 'Bạn không có quyền thêm loại văn bản.');
+        }
+
         $validated = $request->validate([
             'type_name' => 'required|string|max:255|unique:document_types,type_name',
+        ], [
+            'type_name.required' => 'Vui lòng nhập tên loại văn bản.',
+            'type_name.max' => 'Tên loại văn bản tối đa 255 ký tự.',
+            'type_name.unique' => 'Loại văn bản này đã tồn tại trong hệ thống.',
         ]);
 
-        DocumentType::create($validated);
-        log_activity("Thêm loại văn bản: {$validated['type_name']}");
+        $type = DocumentType::create($validated);
+        log_activity("Thêm loại văn bản: {$type->type_name}");
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Đã thêm loại văn bản mới.',
+                'type' => [
+                    'id' => $type->id,
+                    'type_name' => $type->type_name,
+                ],
+            ], 201);
+        }
 
         return back()->with('success', 'Đã thêm loại văn bản mới.');
     }

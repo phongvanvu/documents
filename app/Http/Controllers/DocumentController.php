@@ -10,6 +10,7 @@ use App\Models\IssuingAuthority;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class DocumentController extends Controller
 {
@@ -324,21 +325,60 @@ class DocumentController extends Controller
         ]);
     }
 
-    // AJAX Kiểm tra trùng số hiệu
+    /**
+     * AJAX tìm kiếm & cảnh báo trùng hoặc tương tự số hiệu văn bản.
+     */
     public function checkDuplicate(Request $request)
     {
-        $docNum = trim($request->get('document_number', ''));
+        $docNum = trim((string) $request->get('document_number', ''));
         $excludeId = (int) $request->get('exclude_id', 0);
 
-        if (empty($docNum)) {
-            return response()->json(['exists' => false]);
+        if (mb_strlen($docNum, 'UTF-8') < 2) {
+            return response()->json([
+                'status' => 'success',
+                'exists' => false,
+                'exact_exists' => false,
+                'count' => 0,
+                'documents' => [],
+            ]);
         }
 
-        $exists = Document::where('document_number', $docNum)
-            ->when($excludeId > 0, fn($q) => $q->where('id', '!=', $excludeId))
-            ->exists();
+        $escapedLike = '%' . addcslashes($docNum, '%_\\') . '%';
 
-        return response()->json(['exists' => $exists]);
+        $matches = Document::with(['documentType', 'issuingAuthority'])
+            ->when($excludeId > 0, fn($q) => $q->where('id', '!=', $excludeId))
+            ->where('document_number', 'like', $escapedLike)
+            ->orderByRaw('CASE WHEN LOWER(document_number) = LOWER(?) THEN 0 ELSE 1 END', [$docNum])
+            ->orderBy('issued_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->take(10)
+            ->get();
+
+        $normalizedTarget = mb_strtolower($docNum, 'UTF-8');
+
+        $documents = $matches->map(function (Document $doc) use ($normalizedTarget) {
+            $isExact = mb_strtolower(trim((string) $doc->document_number), 'UTF-8') === $normalizedTarget;
+
+            return [
+                'id' => $doc->id,
+                'document_number' => $doc->document_number,
+                'is_exact' => $isExact,
+                'content' => $doc->content ? Str::limit($doc->content, 90) : '(Chưa có trích yếu)',
+                'type_name' => $doc->documentType?->type_name ?? 'Chưa rõ',
+                'authority_name' => $doc->issuingAuthority?->authority_name ?? 'Chưa rõ',
+                'issued_date_formatted' => $doc->issued_date ? $doc->issued_date->format('d/m/Y') : 'Chưa rõ',
+                'status' => $doc->status ?? 'Không xác định',
+                'url' => route('documents.show', $doc->id),
+            ];
+        })->values();
+
+        return response()->json([
+            'status' => 'success',
+            'exists' => $documents->isNotEmpty(),
+            'exact_exists' => $documents->contains(fn($d) => $d['is_exact']),
+            'count' => $documents->count(),
+            'documents' => $documents,
+        ]);
     }
 
     // Tải tệp văn bản chính

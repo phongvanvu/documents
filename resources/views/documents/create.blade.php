@@ -2,6 +2,64 @@
 
 @section('title', 'Thêm văn bản mới - ' . get_setting('site_title'))
 
+@push('styles')
+<style>
+    .searchable-select-native {
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+    .searchable-select-trigger {
+        cursor: pointer;
+        background-color: #fff;
+    }
+    .searchable-select-trigger:focus {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+    }
+    .searchable-select-menu {
+        z-index: 1060;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+    .searchable-select-list {
+        max-height: 240px;
+        overflow-y: auto;
+    }
+    .searchable-select-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        text-align: left;
+        padding: 0.45rem 0.65rem;
+        border: 0;
+        background: transparent;
+        border-radius: 0.35rem;
+        font-size: 0.9rem;
+        color: #212529;
+        cursor: pointer;
+    }
+    .searchable-select-option:hover,
+    .searchable-select-option.is-highlighted {
+        background-color: #f8d7da;
+        color: #842029;
+    }
+    .searchable-select-option.is-selected {
+        background-color: #dc3545;
+        color: #fff;
+        font-weight: 600;
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="row justify-content-center">
     <div class="col-lg-10">
@@ -20,43 +78,97 @@
                         <!-- Số / Ký hiệu -->
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Số / Ký hiệu văn bản <span class="text-danger">*</span></label>
-                            <input type="text" name="document_number" id="document_number"
-                                   class="form-control @error('document_number') is-invalid @enderror"
-                                   value="{{ old('document_number') }}" placeholder="VD: 123/QĐ-BV, 45/TB-TCKT..." required>
-                            <div id="duplicateAlert" class="small mt-1 text-danger d-none">
-                                <i class="fas fa-exclamation-triangle me-1"></i>Số hiệu này đã tồn tại trong hệ thống!
+                            <div class="input-group has-validation">
+                                <input type="text" name="document_number" id="document_number"
+                                       class="form-control @error('document_number') is-invalid @enderror"
+                                       value="{{ old('document_number') }}" placeholder="VD: 123/QĐ-BV, 45/TB-TCKT..."
+                                       autocomplete="off" required>
+                                <button type="button" class="btn btn-outline-secondary" id="btnManualCheckDuplicate" title="Tìm & kiểm tra trùng số hiệu ngay">
+                                    <i class="fas fa-search me-1"></i>Kiểm tra
+                                </button>
+                                @error('document_number')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                             </div>
-                            @error('document_number')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            <div id="checkDocLoading" class="small text-muted mt-1 d-none">
+                                <i class="fas fa-spinner fa-spin me-1 text-danger"></i>Đang tìm kiếm văn bản trùng...
+                            </div>
+                            <div id="duplicateAlert" class="small mt-1 text-danger fw-semibold d-none">
+                                <i class="fas fa-exclamation-triangle me-1"></i><span id="duplicateAlertText">Số hiệu này đã tồn tại trong hệ thống!</span>
+                            </div>
                         </div>
 
                         <!-- Loại văn bản -->
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Loại văn bản <span class="text-danger">*</span></label>
-                            <select name="document_type_id" class="form-select @error('document_type_id') is-invalid @enderror" required>
-                                <option value="">-- Chọn loại VB --</option>
-                                @foreach($documentTypes as $t)
-                                    <option value="{{ $t->id }}" {{ old('document_type_id') == $t->id ? 'selected' : '' }}>{{ $t->type_name }}</option>
-                                @endforeach
-                            </select>
+                            <label class="form-label fw-semibold" for="document_type_id">Loại văn bản <span class="text-danger">*</span></label>
+                            <div class="d-flex gap-1 align-items-start">
+                                <div class="flex-grow-1 min-w-0">
+                                    <select name="document_type_id" id="document_type_id"
+                                            class="form-select searchable-select @error('document_type_id') is-invalid @enderror"
+                                            data-placeholder="-- Chọn hoặc gõ tìm loại VB --"
+                                            data-search-placeholder="Gõ để tìm loại văn bản..."
+                                            required>
+                                        <option value="">-- Chọn loại VB --</option>
+                                        @foreach($documentTypes as $t)
+                                            <option value="{{ $t->id }}" {{ old('document_type_id') == $t->id ? 'selected' : '' }}>{{ $t->type_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-outline-danger flex-shrink-0" id="btnOpenAddTypeModal"
+                                        title="Thêm loại văn bản mới" aria-label="Thêm loại văn bản mới">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                             @error('document_type_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
                         </div>
 
                         <!-- Cơ quan ban hành -->
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Cơ quan ban hành <span class="text-danger">*</span></label>
-                            <select name="authority_id" class="form-select @error('authority_id') is-invalid @enderror" required>
+                            <label class="form-label fw-semibold" for="authority_id">Cơ quan ban hành <span class="text-danger">*</span></label>
+                            <select name="authority_id" id="authority_id"
+                                    class="form-select searchable-select @error('authority_id') is-invalid @enderror"
+                                    data-placeholder="-- Chọn hoặc gõ tìm cơ quan --"
+                                    data-search-placeholder="Gõ để tìm cơ quan..."
+                                    required>
                                 <option value="">-- Chọn cơ quan --</option>
                                 @foreach($authorities as $a)
                                     <option value="{{ $a->id }}" {{ old('authority_id') == $a->id ? 'selected' : '' }}>{{ $a->authority_name }}</option>
                                 @endforeach
                             </select>
                             @error('authority_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
+                        </div>
+                    </div>
+
+                    <!-- KHUNG TÌM KIẾM & CẢNH BÁO TRÙNG SỐ HIỆU -->
+                    <div id="duplicateResultsContainer" class="mb-3 d-none">
+                        <div class="p-3 rounded-3 shadow-sm" style="background-color: #fff8e1; border: 1.5px solid #ffe082; border-left: 5px solid #dc3545;">
+                            <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+                                <div class="fw-bold text-danger small fs-6" id="duplicateBoxTitle">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>Phát hiện <span id="duplicateCountText" class="badge bg-danger rounded-pill">0</span> văn bản có số ký hiệu tương tự:
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" id="btnCloseDuplicateBox" title="Đóng cảnh báo này">
+                                    <i class="fas fa-times me-1"></i>Đóng
+                                </button>
+                            </div>
+                            <div class="table-responsive bg-white rounded border">
+                                <table class="table table-sm table-hover align-middle mb-0 small">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 170px;">Số / Ký hiệu</th>
+                                            <th>Trích yếu nội dung</th>
+                                            <th style="width: 160px;">Loại / Cơ quan BH</th>
+                                            <th style="width: 100px;" class="text-center">Ngày BH</th>
+                                            <th style="width: 115px;" class="text-center">Hiệu lực</th>
+                                            <th style="width: 65px;" class="text-center">Xem</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="duplicateTableBody"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
@@ -149,26 +261,556 @@
         </div>
     </div>
 </div>
+
+<!-- MODAL THÊM LOẠI VĂN BẢN MỚI -->
+<div class="modal fade" id="modalAddType" tabindex="-1" aria-labelledby="modalAddTypeLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header bg-danger text-white">
+                <h6 class="modal-title fw-bold" id="modalAddTypeLabel">
+                    <i class="fas fa-plus-circle me-2"></i>Thêm loại văn bản mới
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <form id="formAddType">
+                <div class="modal-body p-4">
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold small" for="newTypeNameInput">
+                            Tên loại văn bản <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" name="type_name" id="newTypeNameInput" class="form-control"
+                               placeholder="VD: Nghị định, Thông tư, Hướng dẫn..." maxlength="255" autocomplete="off" required>
+                        <div class="invalid-feedback" id="newTypeNameError"></div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-danger btn-sm px-3 fw-bold" id="btnSubmitAddType">
+                        <i class="fas fa-save me-1"></i>Lưu loại văn bản
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
-    document.getElementById('document_number').addEventListener('blur', function() {
-        var val = this.value.trim();
-        var alertEl = document.getElementById('duplicateAlert');
-        if (val.length > 2) {
-            fetch('{{ route("documents.check-duplicate") }}?document_number=' + encodeURIComponent(val))
-                .then(res => res.json())
-                .then(data => {
-                    if (data.exists) {
-                        alertEl.classList.remove('d-none');
-                    } else {
-                        alertEl.classList.add('d-none');
-                    }
-                });
-        } else {
-            alertEl.classList.add('d-none');
+document.addEventListener('DOMContentLoaded', function() {
+    function normalizeVietnamese(str) {
+        return String(str || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/đ/g, 'd')
+            .replace(/Đ/g, 'D')
+            .toLowerCase()
+            .trim();
+    }
+
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, function(ch) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch];
+        });
+    }
+
+    // =========================================================================
+    // 1. SEARCHABLE SELECT (GÕ TÌM LOẠI VĂN BẢN & CƠ QUAN BAN HÀNH)
+    // =========================================================================
+    function makeSearchableSelect(selectEl) {
+        if (!selectEl || selectEl.dataset.ssInitialized) return;
+        selectEl.dataset.ssInitialized = '1';
+
+        var placeholderText = selectEl.dataset.placeholder || '-- Chọn --';
+        var searchPlaceholder = selectEl.dataset.searchPlaceholder || 'Gõ để tìm...';
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'searchable-select-wrapper position-relative';
+        selectEl.parentNode.insertBefore(wrapper, selectEl);
+        wrapper.appendChild(selectEl);
+
+        selectEl.classList.add('searchable-select-native');
+        selectEl.setAttribute('tabindex', '-1');
+
+        var trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'form-select text-start d-flex align-items-center justify-content-between searchable-select-trigger';
+        if (selectEl.classList.contains('is-invalid')) {
+            trigger.classList.add('is-invalid');
         }
-    });
+
+        var labelSpan = document.createElement('span');
+        labelSpan.className = 'text-truncate pe-2';
+        trigger.appendChild(labelSpan);
+        wrapper.appendChild(trigger);
+
+        var menu = document.createElement('div');
+        menu.className = 'dropdown-menu w-100 p-2 shadow-sm searchable-select-menu';
+
+        var searchWrap = document.createElement('div');
+        searchWrap.className = 'input-group input-group-sm mb-2';
+        searchWrap.innerHTML = '<span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>';
+        var searchInput = document.createElement('input');
+        searchInput.type = 'search';
+        searchInput.className = 'form-control searchable-select-input';
+        searchInput.placeholder = searchPlaceholder;
+        searchInput.setAttribute('autocomplete', 'off');
+        searchWrap.appendChild(searchInput);
+        menu.appendChild(searchWrap);
+
+        var list = document.createElement('div');
+        list.className = 'searchable-select-list';
+        menu.appendChild(list);
+        wrapper.appendChild(menu);
+
+        var isOpen = false;
+        var highlightedIndex = -1;
+        var visibleOptionButtons = [];
+
+        function getOptionsData() {
+            return Array.from(selectEl.options)
+                .filter(function(opt) { return opt.value !== ''; })
+                .map(function(opt) {
+                    return {
+                        value: opt.value,
+                        text: opt.textContent.trim(),
+                        normalized: normalizeVietnamese(opt.textContent)
+                    };
+                });
+        }
+
+        function syncLabel() {
+            var selected = selectEl.options[selectEl.selectedIndex];
+            if (selected && selected.value !== '') {
+                labelSpan.textContent = selected.textContent.trim();
+                labelSpan.classList.remove('text-muted');
+                trigger.classList.remove('is-invalid');
+            } else {
+                labelSpan.textContent = placeholderText;
+                labelSpan.classList.add('text-muted');
+            }
+        }
+
+        function setHighlight(idx) {
+            if (visibleOptionButtons.length === 0) {
+                highlightedIndex = -1;
+                return;
+            }
+            if (idx < 0) idx = visibleOptionButtons.length - 1;
+            if (idx >= visibleOptionButtons.length) idx = 0;
+
+            visibleOptionButtons.forEach(function(btn) { btn.classList.remove('is-highlighted'); });
+            highlightedIndex = idx;
+            var activeBtn = visibleOptionButtons[highlightedIndex];
+            if (activeBtn) {
+                activeBtn.classList.add('is-highlighted');
+                activeBtn.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function selectValue(val) {
+            selectEl.value = val;
+            selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+            syncLabel();
+            closeMenu(true);
+        }
+
+        function renderList(filterTerm) {
+            var q = normalizeVietnamese(filterTerm);
+            var items = getOptionsData().filter(function(item) {
+                return !q || item.normalized.includes(q);
+            });
+
+            list.innerHTML = '';
+            visibleOptionButtons = [];
+            highlightedIndex = -1;
+
+            if (items.length === 0) {
+                var emptyDiv = document.createElement('div');
+                emptyDiv.className = 'text-muted small text-center py-2 fst-italic';
+                emptyDiv.textContent = 'Không tìm thấy kết quả phù hợp.';
+                list.appendChild(emptyDiv);
+
+                if (selectEl.id === 'document_type_id' && filterTerm.trim() !== '') {
+                    var quickAddBtn = document.createElement('button');
+                    quickAddBtn.type = 'button';
+                    quickAddBtn.className = 'btn btn-sm btn-outline-danger w-100 mt-1 fw-semibold';
+                    quickAddBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Thêm "' + escapeHtml(filterTerm.trim()) + '"';
+                    quickAddBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        closeMenu(false);
+                        openAddTypeModal(filterTerm.trim());
+                    });
+                    list.appendChild(quickAddBtn);
+                }
+                return;
+            }
+
+            items.forEach(function(item) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'searchable-select-option';
+                if (item.value === selectEl.value) {
+                    btn.classList.add('is-selected');
+                }
+                btn.textContent = item.text;
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectValue(item.value);
+                });
+                list.appendChild(btn);
+                visibleOptionButtons.push(btn);
+            });
+
+            if (q) {
+                setHighlight(0);
+            } else {
+                var selectedIdx = items.findIndex(function(item) { return item.value === selectEl.value; });
+                if (selectedIdx >= 0) {
+                    setHighlight(selectedIdx);
+                }
+            }
+        }
+
+        function openMenu(initialChar) {
+            document.querySelectorAll('.searchable-select-menu.show').forEach(function(otherMenu) {
+                if (otherMenu !== menu) {
+                    otherMenu.classList.remove('show');
+                }
+            });
+            isOpen = true;
+            menu.classList.add('show');
+            searchInput.value = initialChar || '';
+            renderList(searchInput.value);
+            setTimeout(function() {
+                searchInput.focus();
+                if (initialChar) {
+                    searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+                }
+            }, 0);
+        }
+
+        function closeMenu(returnFocus) {
+            if (!isOpen) return;
+            isOpen = false;
+            menu.classList.remove('show');
+            if (returnFocus) {
+                trigger.focus();
+            }
+        }
+
+        trigger.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isOpen) {
+                closeMenu(false);
+            } else {
+                openMenu('');
+            }
+        });
+
+        trigger.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openMenu('');
+            } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                e.preventDefault();
+                openMenu(e.key);
+            }
+        });
+
+        searchInput.addEventListener('input', function() {
+            renderList(this.value);
+        });
+
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setHighlight(highlightedIndex + 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setHighlight(highlightedIndex - 1);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (highlightedIndex >= 0 && visibleOptionButtons[highlightedIndex]) {
+                    visibleOptionButtons[highlightedIndex].click();
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeMenu(true);
+            } else if (e.key === 'Tab') {
+                closeMenu(false);
+            }
+        });
+
+        selectEl.addEventListener('invalid', function() {
+            trigger.classList.add('is-invalid');
+        });
+
+        document.addEventListener('click', function(e) {
+            if (isOpen && !wrapper.contains(e.target)) {
+                closeMenu(false);
+            }
+        });
+
+        selectEl._searchableSelect = {
+            addAndSelect: function(value, text) {
+                var strVal = String(value);
+                var existing = Array.from(selectEl.options).find(function(opt) {
+                    return opt.value === strVal;
+                });
+                if (!existing) {
+                    var newOpt = document.createElement('option');
+                    newOpt.value = strVal;
+                    newOpt.textContent = text;
+                    selectEl.appendChild(newOpt);
+                }
+                selectEl.value = strVal;
+                selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+                syncLabel();
+            }
+        };
+
+        syncLabel();
+    }
+
+    var modalAddTypeEl = document.getElementById('modalAddType');
+    var formAddType = document.getElementById('formAddType');
+    var newTypeNameInput = document.getElementById('newTypeNameInput');
+    var newTypeNameError = document.getElementById('newTypeNameError');
+    var btnSubmitAddType = document.getElementById('btnSubmitAddType');
+    var btnOpenAddTypeModal = document.getElementById('btnOpenAddTypeModal');
+    var docTypeSelect = document.getElementById('document_type_id');
+
+    function resetAddTypeError() {
+        if (newTypeNameInput) newTypeNameInput.classList.remove('is-invalid');
+        if (newTypeNameError) newTypeNameError.textContent = '';
+    }
+
+    function openAddTypeModal(prefillName) {
+        if (!modalAddTypeEl) return;
+        resetAddTypeError();
+        if (newTypeNameInput) {
+            newTypeNameInput.value = prefillName || '';
+        }
+        bootstrap.Modal.getOrCreateInstance(modalAddTypeEl).show();
+    }
+
+    if (modalAddTypeEl) {
+        modalAddTypeEl.addEventListener('shown.bs.modal', function() {
+            if (newTypeNameInput) {
+                newTypeNameInput.focus();
+                newTypeNameInput.select();
+            }
+        });
+    }
+
+    if (btnOpenAddTypeModal) {
+        btnOpenAddTypeModal.addEventListener('click', function() {
+            openAddTypeModal('');
+        });
+    }
+
+    if (formAddType) {
+        formAddType.addEventListener('submit', function(e) {
+            e.preventDefault();
+            resetAddTypeError();
+
+            var typeName = newTypeNameInput ? newTypeNameInput.value.trim() : '';
+            if (!typeName) {
+                newTypeNameInput.classList.add('is-invalid');
+                newTypeNameError.textContent = 'Vui lòng nhập tên loại văn bản.';
+                return;
+            }
+
+            var origBtnHtml = btnSubmitAddType.innerHTML;
+            btnSubmitAddType.disabled = true;
+            btnSubmitAddType.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang lưu...';
+
+            fetch('{{ route("categories.types.store") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ type_name: typeName })
+            })
+            .then(function(res) {
+                return res.json().then(function(data) {
+                    return { ok: res.ok, status: res.status, data: data };
+                });
+            })
+            .then(function(result) {
+                if (result.ok && result.data.status === 'success' && result.data.type) {
+                    if (docTypeSelect && docTypeSelect._searchableSelect) {
+                        docTypeSelect._searchableSelect.addAndSelect(result.data.type.id, result.data.type.type_name);
+                    }
+                    formAddType.reset();
+                    bootstrap.Modal.getOrCreateInstance(modalAddTypeEl).hide();
+
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: result.data.message || 'Đã thêm loại văn bản mới!',
+                            showConfirmButton: false,
+                            timer: 2000
+                        });
+                    }
+                } else {
+                    var errMsg = (result.data && result.data.errors && result.data.errors.type_name && result.data.errors.type_name[0])
+                        || (result.data && result.data.message)
+                        || 'Không thể thêm loại văn bản mới.';
+                    newTypeNameInput.classList.add('is-invalid');
+                    newTypeNameError.textContent = errMsg;
+                }
+            })
+            .catch(function() {
+                newTypeNameInput.classList.add('is-invalid');
+                newTypeNameError.textContent = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+            })
+            .finally(function() {
+                btnSubmitAddType.disabled = false;
+                btnSubmitAddType.innerHTML = origBtnHtml;
+            });
+        });
+    }
+
+    document.querySelectorAll('select.searchable-select').forEach(makeSearchableSelect);
+
+    // =========================================================================
+    // 2. TÌM KIẾM & CẢNH BÁO TRÙNG SỐ HIỆU VĂN BẢN KHI GÕ
+    // =========================================================================
+    var docInput = document.getElementById('document_number');
+    var checkLoading = document.getElementById('checkDocLoading');
+    var duplicateAlert = document.getElementById('duplicateAlert');
+    var duplicateAlertText = document.getElementById('duplicateAlertText');
+    var duplicateBox = document.getElementById('duplicateResultsContainer');
+    var duplicateBoxTitle = document.getElementById('duplicateBoxTitle');
+    var duplicateTableBody = document.getElementById('duplicateTableBody');
+    var btnManualCheck = document.getElementById('btnManualCheckDuplicate');
+    var btnCloseBox = document.getElementById('btnCloseDuplicateBox');
+
+    var checkTimeout = null;
+    var activeRequestId = 0;
+    var lastCheckedQuery = null;
+
+    function statusBadgeClass(status) {
+        if (status === 'Còn hiệu lực') return 'bg-success';
+        if (status === 'Hết hiệu lực') return 'bg-danger';
+        if (status === 'Chưa có hiệu lực') return 'bg-warning text-dark';
+        return 'bg-secondary';
+    }
+
+    function runVerifyDuplicate(forceAlert) {
+        if (!docInput) return;
+        var query = docInput.value.trim();
+        lastCheckedQuery = query;
+
+        if (query.length < 2) {
+            duplicateAlert.classList.add('d-none');
+            duplicateBox.classList.add('d-none');
+            checkLoading.classList.add('d-none');
+            duplicateTableBody.innerHTML = '';
+            return;
+        }
+
+        checkLoading.classList.remove('d-none');
+        var requestId = ++activeRequestId;
+
+        fetch('{{ route("documents.check-duplicate") }}?document_number=' + encodeURIComponent(query), {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (requestId !== activeRequestId) return;
+            checkLoading.classList.add('d-none');
+
+            var docs = Array.isArray(data.documents) ? data.documents : [];
+            if (data.exists && docs.length > 0) {
+                if (data.exact_exists) {
+                    duplicateAlertText.textContent = 'Cảnh báo: Số hiệu này đã tồn tại chính xác trong hệ thống!';
+                    duplicateAlert.classList.remove('d-none');
+                    duplicateBoxTitle.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Cảnh báo: Phát hiện văn bản <span class="text-decoration-underline">TRÙNG CHÍNH XÁC</span> và các số hiệu tương tự (' + docs.length + '):';
+                } else {
+                    duplicateAlertText.textContent = 'Tìm thấy ' + docs.length + ' văn bản có số ký hiệu gần giống bên dưới.';
+                    duplicateAlert.classList.remove('d-none');
+                    duplicateBoxTitle.innerHTML = '<i class="fas fa-search me-2"></i>Tìm thấy <span class="badge bg-danger rounded-pill">' + docs.length + '</span> văn bản có số ký hiệu tương tự:';
+                }
+
+                duplicateTableBody.innerHTML = docs.map(function(d) {
+                    var exactBadge = d.is_exact ? '<span class="badge bg-danger ms-1">Trùng khớp</span>' : '';
+                    return '<tr>' +
+                        '<td class="fw-bold text-danger">' + escapeHtml(d.document_number) + exactBadge + '</td>' +
+                        '<td>' + escapeHtml(d.content) + '</td>' +
+                        '<td><div class="fw-semibold text-dark">' + escapeHtml(d.type_name) + '</div><div class="text-muted" style="font-size: 0.75rem;">' + escapeHtml(d.authority_name) + '</div></td>' +
+                        '<td class="text-center text-nowrap">' + escapeHtml(d.issued_date_formatted) + '</td>' +
+                        '<td class="text-center text-nowrap"><span class="badge ' + statusBadgeClass(d.status) + '">' + escapeHtml(d.status) + '</span></td>' +
+                        '<td class="text-center"><a href="' + escapeHtml(d.url) + '" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2" title="Mở xem trong tab mới"><i class="fas fa-external-link-alt"></i></a></td>' +
+                    '</tr>';
+                }).join('');
+
+                duplicateBox.classList.remove('d-none');
+            } else {
+                duplicateAlert.classList.add('d-none');
+                duplicateBox.classList.add('d-none');
+                duplicateTableBody.innerHTML = '';
+
+                if (forceAlert && typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'Không tìm thấy văn bản trùng số hiệu',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                }
+            }
+        })
+        .catch(function() {
+            if (requestId === activeRequestId) {
+                checkLoading.classList.add('d-none');
+            }
+        });
+    }
+
+    if (docInput) {
+        docInput.addEventListener('input', function() {
+            clearTimeout(checkTimeout);
+            checkTimeout = setTimeout(function() { runVerifyDuplicate(false); }, 400);
+        });
+
+        docInput.addEventListener('blur', function() {
+            clearTimeout(checkTimeout);
+            if (docInput.value.trim() !== lastCheckedQuery) {
+                runVerifyDuplicate(false);
+            }
+        });
+
+        if (docInput.value.trim().length >= 2) {
+            runVerifyDuplicate(false);
+        }
+    }
+
+    if (btnManualCheck) {
+        btnManualCheck.addEventListener('click', function(e) {
+            e.preventDefault();
+            clearTimeout(checkTimeout);
+            runVerifyDuplicate(true);
+        });
+    }
+
+    if (btnCloseBox) {
+        btnCloseBox.addEventListener('click', function(e) {
+            e.preventDefault();
+            duplicateBox.classList.add('d-none');
+        });
+    }
+});
 </script>
 @endpush
