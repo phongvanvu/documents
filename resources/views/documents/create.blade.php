@@ -4,6 +4,36 @@
 
 @push('styles')
 <style>
+    /* Bảo đảm toàn bộ khung thêm văn bản gọn trong card, không tràn ngang */
+    #documentForm .row > [class*="col-"] {
+        min-width: 0;
+    }
+    .category-picker-group {
+        display: flex;
+        align-items: stretch;
+        gap: 0.375rem;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
+    .category-picker-field {
+        flex: 1 1 0%;
+        min-width: 0 !important;
+        max-width: 100%;
+    }
+    .btn-quick-add-cat {
+        flex: 0 0 auto;
+        padding: 0.45rem 0.8rem !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+    }
+    .searchable-select-wrapper {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
     .searchable-select-native {
         position: absolute;
         bottom: 0;
@@ -16,9 +46,27 @@
         padding: 0;
         border: 0;
     }
+    .searchable-select-trigger,
+    #documentForm select.form-select {
+        padding: 0.45rem 2.25rem 0.45rem 0.9rem !important;
+    }
     .searchable-select-trigger {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        display: flex;
+        align-items: center;
         cursor: pointer;
         background-color: #fff;
+        text-align: left;
+    }
+    .searchable-select-label {
+        display: block;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     .searchable-select-trigger:focus {
         border-color: #dc3545;
@@ -26,17 +74,22 @@
     }
     .searchable-select-menu {
         z-index: 1060;
+        top: 100%;
+        left: 0;
+        margin-top: 0.25rem;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
         border-radius: 0.5rem;
         border: 1px solid rgba(0, 0, 0, 0.15);
     }
     .searchable-select-list {
         max-height: 240px;
         overflow-y: auto;
+        overflow-x: hidden;
     }
     .searchable-select-option {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        display: block;
         width: 100%;
         text-align: left;
         padding: 0.45rem 0.65rem;
@@ -46,6 +99,8 @@
         font-size: 0.9rem;
         color: #212529;
         cursor: pointer;
+        white-space: normal;
+        word-break: break-word;
     }
     .searchable-select-option:hover,
     .searchable-select-option.is-highlighted {
@@ -57,6 +112,25 @@
         color: #fff;
         font-weight: 600;
     }
+    .quick-add-inline-box {
+        background-color: #fff8f8;
+        border: 1px solid #f5c2c7;
+        border-radius: 0.5rem;
+        padding: 0.6rem;
+        margin-top: 0.45rem;
+    }
+    .quick-add-inline-box .quick-add-input {
+        flex: 1 1 0%;
+        min-width: 0;
+    }
+    .quick-add-inline-box .btn {
+        padding: 0.3rem 0.65rem !important;
+        font-size: 0.85rem;
+    }
+    #btnManualCheckDuplicate {
+        padding: 0.45rem 0.85rem !important;
+        white-space: nowrap;
+    }
 </style>
 @endpush
 
@@ -64,7 +138,7 @@
 <div class="row justify-content-center">
     <div class="col-lg-10">
         <div class="card border-0 shadow-sm rounded-4 mb-4">
-            <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+            <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="fw-bold mb-0 text-dark"><i class="fas fa-plus-circle text-danger me-2"></i>Thêm văn bản pháp quy mới</h5>
                 <a href="{{ route('documents.index') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
                     <i class="fas fa-arrow-left me-1"></i>Quay lại danh sách
@@ -74,10 +148,11 @@
                 <form action="{{ route('documents.store') }}" method="POST" enctype="multipart/form-data" id="documentForm">
                     @csrf
 
+                    <!-- HÀNG 1: SỐ KÝ HIỆU & NGÀY BAN HÀNH -->
                     <div class="row g-3 mb-3">
                         <!-- Số / Ký hiệu -->
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Số / Ký hiệu văn bản <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold" for="document_number">Số / Ký hiệu văn bản <span class="text-danger">*</span></label>
                             <div class="input-group has-validation">
                                 <input type="text" name="document_number" id="document_number"
                                        class="form-control @error('document_number') is-invalid @enderror"
@@ -98,55 +173,13 @@
                             </div>
                         </div>
 
-                        <!-- Loại văn bản -->
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold" for="document_type_id">Loại văn bản <span class="text-danger">*</span></label>
-                            <div class="d-flex gap-1 align-items-start">
-                                <div class="flex-grow-1 min-w-0">
-                                    <select name="document_type_id" id="document_type_id"
-                                            class="form-select searchable-select @error('document_type_id') is-invalid @enderror"
-                                            data-placeholder="-- Chọn hoặc gõ tìm loại VB --"
-                                            data-search-placeholder="Gõ để tìm loại văn bản..."
-                                            required>
-                                        <option value="">-- Chọn loại VB --</option>
-                                        @foreach($documentTypes as $t)
-                                            <option value="{{ $t->id }}" {{ old('document_type_id') == $t->id ? 'selected' : '' }}>{{ $t->type_name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <button type="button" class="btn btn-outline-danger flex-shrink-0" id="btnOpenAddTypeModal"
-                                        title="Thêm loại văn bản mới" aria-label="Thêm loại văn bản mới">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                            </div>
-                            @error('document_type_id')
-                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <!-- Cơ quan ban hành -->
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold" for="authority_id">Cơ quan ban hành <span class="text-danger">*</span></label>
-                            <div class="d-flex gap-1 align-items-start">
-                                <div class="flex-grow-1 min-w-0">
-                                    <select name="authority_id" id="authority_id"
-                                            class="form-select searchable-select @error('authority_id') is-invalid @enderror"
-                                            data-placeholder="-- Chọn hoặc gõ tìm cơ quan --"
-                                            data-search-placeholder="Gõ để tìm cơ quan..."
-                                            required>
-                                        <option value="">-- Chọn cơ quan --</option>
-                                        @foreach($authorities as $a)
-                                            <option value="{{ $a->id }}" {{ old('authority_id') == $a->id ? 'selected' : '' }}>{{ $a->authority_name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <button type="button" class="btn btn-outline-danger flex-shrink-0" id="btnOpenAddAuthorityModal"
-                                        title="Thêm cơ quan ban hành mới" aria-label="Thêm cơ quan ban hành mới">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                            </div>
-                            @error('authority_id')
-                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                        <!-- Ngày ban hành -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" for="issued_date">Ngày ban hành <span class="text-danger">*</span></label>
+                            <input type="date" name="issued_date" id="issued_date" class="form-control @error('issued_date') is-invalid @enderror"
+                                   value="{{ old('issued_date') }}" required>
+                            @error('issued_date')
+                                <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
                     </div>
@@ -180,17 +213,103 @@
                         </div>
                     </div>
 
+                    <!-- HÀNG 2: LOẠI VĂN BẢN & CƠ QUAN BAN HÀNH (CÙNG UI & CƠ CHẾ THÊM TẠI CHỖ) -->
+                    @php
+                        $categoryPickers = [
+                            [
+                                'id' => 'document_type_id',
+                                'name' => 'document_type_id',
+                                'label' => 'Loại văn bản',
+                                'placeholder' => '-- Chọn hoặc gõ tìm loại văn bản --',
+                                'searchPlaceholder' => 'Gõ để tìm loại văn bản...',
+                                'emptyOption' => '-- Chọn loại VB --',
+                                'addBtnTitle' => 'Thêm loại văn bản mới tại chỗ',
+                                'inlinePlaceholder' => 'Nhập tên loại văn bản mới...',
+                                'fieldName' => 'type_name',
+                                'storeUrl' => route('categories.types.store'),
+                                'emptyError' => 'Vui lòng nhập tên loại văn bản.',
+                                'items' => $documentTypes,
+                                'itemLabelKey' => 'type_name',
+                            ],
+                            [
+                                'id' => 'authority_id',
+                                'name' => 'authority_id',
+                                'label' => 'Cơ quan ban hành',
+                                'placeholder' => '-- Chọn hoặc gõ tìm cơ quan ban hành --',
+                                'searchPlaceholder' => 'Gõ để tìm cơ quan ban hành...',
+                                'emptyOption' => '-- Chọn cơ quan --',
+                                'addBtnTitle' => 'Thêm cơ quan ban hành mới tại chỗ',
+                                'inlinePlaceholder' => 'Nhập tên cơ quan ban hành mới...',
+                                'fieldName' => 'authority_name',
+                                'storeUrl' => route('categories.authorities.store'),
+                                'emptyError' => 'Vui lòng nhập tên cơ quan ban hành.',
+                                'items' => $authorities,
+                                'itemLabelKey' => 'authority_name',
+                            ],
+                        ];
+                    @endphp
                     <div class="row g-3 mb-3">
-                        <!-- Ngày ban hành -->
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold" for="issued_date">Ngày ban hành <span class="text-danger">*</span></label>
-                            <input type="date" name="issued_date" id="issued_date" class="form-control @error('issued_date') is-invalid @enderror"
-                                   value="{{ old('issued_date') }}" required>
-                            @error('issued_date')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
+                        @foreach($categoryPickers as $picker)
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold" for="{{ $picker['id'] }}">
+                                    {{ $picker['label'] }} <span class="text-danger">*</span>
+                                </label>
+                                <div class="category-picker-group">
+                                    <div class="category-picker-field">
+                                        <select name="{{ $picker['name'] }}" id="{{ $picker['id'] }}"
+                                                class="form-select searchable-select @error($picker['name']) is-invalid @enderror"
+                                                data-placeholder="{{ $picker['placeholder'] }}"
+                                                data-search-placeholder="{{ $picker['searchPlaceholder'] }}"
+                                                required>
+                                            <option value="">{{ $picker['emptyOption'] }}</option>
+                                            @foreach($picker['items'] as $opt)
+                                                @php $optLabel = $opt->{$picker['itemLabelKey']}; @endphp
+                                                <option value="{{ $opt->id }}" {{ old($picker['name']) == $opt->id ? 'selected' : '' }}>
+                                                    {{ $optLabel }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <button type="button"
+                                            class="btn btn-outline-danger btn-quick-add-cat"
+                                            data-quick-add-toggle="{{ $picker['id'] }}"
+                                            title="{{ $picker['addBtnTitle'] }}"
+                                            aria-label="{{ $picker['addBtnTitle'] }}">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                                @error($picker['name'])
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
 
+                                <!-- Khung thêm nhanh tại chỗ (cùng UI & cơ chế cho Loại VB và Cơ quan BH) -->
+                                <div class="quick-add-inline-box d-none"
+                                     id="quickAddBox_{{ $picker['id'] }}"
+                                     data-select-id="{{ $picker['id'] }}"
+                                     data-field-name="{{ $picker['fieldName'] }}"
+                                     data-store-url="{{ $picker['storeUrl'] }}"
+                                     data-empty-error="{{ $picker['emptyError'] }}">
+                                    <div class="d-flex gap-1 align-items-center">
+                                        <input type="text"
+                                               class="form-control form-control-sm quick-add-input"
+                                               placeholder="{{ $picker['inlinePlaceholder'] }}"
+                                               maxlength="255"
+                                               autocomplete="off">
+                                        <button type="button" class="btn btn-danger btn-sm fw-bold flex-shrink-0 quick-add-save">
+                                            <i class="fas fa-check me-1"></i>Lưu
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 quick-add-cancel" title="Đóng">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="invalid-feedback d-none quick-add-error mt-1"></div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <!-- HÀNG 3: NGÀY CÓ HIỆU LỰC, NGÀY HẾT HIỆU LỰC & TRẠNG THÁI -->
+                    <div class="row g-3 mb-3">
                         <!-- Ngày có hiệu lực -->
                         <div class="col-md-4">
                             <label class="form-label fw-semibold" for="effective_date">Ngày có hiệu lực</label>
@@ -203,20 +322,18 @@
 
                         <!-- Ngày hết hiệu lực -->
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Ngày hết hiệu lực</label>
-                            <input type="date" name="expired_date" class="form-control @error('expired_date') is-invalid @enderror"
+                            <label class="form-label fw-semibold" for="expired_date">Ngày hết hiệu lực</label>
+                            <input type="date" name="expired_date" id="expired_date" class="form-control @error('expired_date') is-invalid @enderror"
                                    value="{{ old('expired_date') }}">
                             @error('expired_date')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                    </div>
 
-                    <div class="row g-3 mb-3">
                         <!-- Trạng thái -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Trạng thái hiệu lực <span class="text-danger">*</span></label>
-                            <select name="status" class="form-select @error('status') is-invalid @enderror" required>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold" for="status">Trạng thái hiệu lực <span class="text-danger">*</span></label>
+                            <select name="status" id="status" class="form-select @error('status') is-invalid @enderror" required>
                                 <option value="Còn hiệu lực" {{ old('status', 'Còn hiệu lực') === 'Còn hiệu lực' ? 'selected' : '' }}>Còn hiệu lực</option>
                                 <option value="Hết hiệu lực" {{ old('status') === 'Hết hiệu lực' ? 'selected' : '' }}>Hết hiệu lực</option>
                                 <option value="Chưa có hiệu lực" {{ old('status') === 'Chưa có hiệu lực' ? 'selected' : '' }}>Chưa có hiệu lực</option>
@@ -227,22 +344,22 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-
-                        <!-- Tệp đính kèm -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Tệp văn bản chính (PDF, Word, Excel, ZIP... tối đa 120MB)</label>
-                            <input type="file" name="document_file" class="form-control @error('document_file') is-invalid @enderror"
-                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.rar">
-                            @error('document_file')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
                     </div>
 
-                    <!-- Trích yếu nội dung -->
+                    <!-- HÀNG 4: TỆP ĐÍNH KÈM -->
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Trích yếu nội dung <span class="text-danger">*</span></label>
-                        <textarea name="content" rows="4" class="form-control @error('content') is-invalid @enderror"
+                        <label class="form-label fw-semibold" for="document_file">Tệp văn bản chính (PDF, Word, Excel, ZIP... tối đa 120MB)</label>
+                        <input type="file" name="document_file" id="document_file" class="form-control @error('document_file') is-invalid @enderror"
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.rar">
+                        @error('document_file')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <!-- HÀNG 5: TRÍCH YẾU NỘI DUNG -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="doc_content">Trích yếu nội dung <span class="text-danger">*</span></label>
+                        <textarea name="content" id="doc_content" rows="4" class="form-control @error('content') is-invalid @enderror"
                                   placeholder="Nhập tóm tắt trích yếu nội dung của văn bản..." required>{{ old('content') }}</textarea>
                         @error('content')
                             <div class="invalid-feedback">{{ $message }}</div>
@@ -269,70 +386,6 @@
         </div>
     </div>
 </div>
-
-<!-- MODAL THÊM LOẠI VĂN BẢN MỚI -->
-<div class="modal fade" id="modalAddType" tabindex="-1" aria-labelledby="modalAddTypeLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4 border-0 shadow">
-            <div class="modal-header bg-danger text-white">
-                <h6 class="modal-title fw-bold" id="modalAddTypeLabel">
-                    <i class="fas fa-plus-circle me-2"></i>Thêm loại văn bản mới
-                </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
-            </div>
-            <form id="formAddType">
-                <div class="modal-body p-4">
-                    <div class="mb-2">
-                        <label class="form-label fw-semibold small" for="newTypeNameInput">
-                            Tên loại văn bản <span class="text-danger">*</span>
-                        </label>
-                        <input type="text" name="type_name" id="newTypeNameInput" class="form-control"
-                               placeholder="VD: Nghị định, Thông tư, Hướng dẫn..." maxlength="255" autocomplete="off" required>
-                        <div class="invalid-feedback" id="newTypeNameError"></div>
-                    </div>
-                </div>
-                <div class="modal-footer border-top">
-                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-danger btn-sm px-3 fw-bold" id="btnSubmitAddType">
-                        <i class="fas fa-save me-1"></i>Lưu loại văn bản
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL THÊM CƠ QUAN BAN HÀNH MỚI -->
-<div class="modal fade" id="modalAddAuthority" tabindex="-1" aria-labelledby="modalAddAuthorityLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4 border-0 shadow">
-            <div class="modal-header bg-danger text-white">
-                <h6 class="modal-title fw-bold" id="modalAddAuthorityLabel">
-                    <i class="fas fa-building me-2"></i>Thêm cơ quan ban hành mới
-                </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
-            </div>
-            <form id="formAddAuthority">
-                <div class="modal-body p-4">
-                    <div class="mb-2">
-                        <label class="form-label fw-semibold small" for="newAuthorityNameInput">
-                            Tên cơ quan ban hành <span class="text-danger">*</span>
-                        </label>
-                        <input type="text" name="authority_name" id="newAuthorityNameInput" class="form-control"
-                               placeholder="VD: Bộ Công an, Bộ Y tế, Chính phủ..." maxlength="255" autocomplete="off" required>
-                        <div class="invalid-feedback" id="newAuthorityNameError"></div>
-                    </div>
-                </div>
-                <div class="modal-footer border-top">
-                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-danger btn-sm px-3 fw-bold" id="btnSubmitAddAuthority">
-                        <i class="fas fa-save me-1"></i>Lưu cơ quan ban hành
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 @endsection
 
 @push('scripts')
@@ -354,6 +407,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    var quickAddHandlers = {};
+
     // =========================================================================
     // 1. SEARCHABLE SELECT (GÕ TÌM LOẠI VĂN BẢN & CƠ QUAN BAN HÀNH)
     // =========================================================================
@@ -374,18 +429,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var trigger = document.createElement('button');
         trigger.type = 'button';
-        trigger.className = 'form-select text-start d-flex align-items-center justify-content-between searchable-select-trigger';
+        trigger.className = 'form-select searchable-select-trigger';
         if (selectEl.classList.contains('is-invalid')) {
             trigger.classList.add('is-invalid');
         }
 
         var labelSpan = document.createElement('span');
-        labelSpan.className = 'text-truncate pe-2';
+        labelSpan.className = 'searchable-select-label';
         trigger.appendChild(labelSpan);
         wrapper.appendChild(trigger);
 
         var menu = document.createElement('div');
-        menu.className = 'dropdown-menu w-100 p-2 shadow-sm searchable-select-menu';
+        menu.className = 'dropdown-menu p-2 shadow-sm searchable-select-menu';
 
         var searchWrap = document.createElement('div');
         searchWrap.className = 'input-group input-group-sm mb-2';
@@ -474,13 +529,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (quickAddHandlers[selectEl.id] && filterTerm.trim() !== '') {
                     var quickAddBtn = document.createElement('button');
                     quickAddBtn.type = 'button';
-                    quickAddBtn.className = 'btn btn-sm btn-outline-danger w-100 mt-1 fw-semibold';
+                    quickAddBtn.className = 'btn btn-sm btn-outline-danger w-100 mt-1 fw-semibold text-truncate';
                     quickAddBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Thêm "' + escapeHtml(filterTerm.trim()) + '"';
                     quickAddBtn.addEventListener('click', function(e) {
                         e.preventDefault();
                         e.stopPropagation();
                         closeMenu(false);
-                        quickAddHandlers[selectEl.id](filterTerm.trim());
+                        quickAddHandlers[selectEl.id].open(filterTerm.trim());
                     });
                     list.appendChild(quickAddBtn);
                 }
@@ -616,155 +671,161 @@ document.addEventListener('DOMContentLoaded', function() {
         syncLabel();
     }
 
-    var quickAddHandlers = {};
+    // =========================================================================
+    // 2. THÊM MỚI TẠI CHỖ CHO LOẠI VĂN BẢN & CƠ QUAN BAN HÀNH (CÙNG UI/CƠ CHẾ)
+    // =========================================================================
+    function initQuickAddInlineBox(boxEl) {
+        var selectId = boxEl.dataset.selectId;
+        var fieldName = boxEl.dataset.fieldName;
+        var storeUrl = boxEl.dataset.storeUrl;
+        var emptyError = boxEl.dataset.emptyError;
 
-    function initQuickAddCategory(cfg) {
-        var modalEl = document.getElementById(cfg.modalId);
-        var formEl = document.getElementById(cfg.formId);
-        var inputEl = document.getElementById(cfg.inputId);
-        var errorEl = document.getElementById(cfg.errorId);
-        var submitBtn = document.getElementById(cfg.submitBtnId);
-        var openBtn = document.getElementById(cfg.openBtnId);
-        var targetSelect = document.getElementById(cfg.selectId);
+        var targetSelect = document.getElementById(selectId);
+        var toggleBtn = document.querySelector('[data-quick-add-toggle="' + selectId + '"]');
+        var inputEl = boxEl.querySelector('.quick-add-input');
+        var saveBtn = boxEl.querySelector('.quick-add-save');
+        var cancelBtn = boxEl.querySelector('.quick-add-cancel');
+        var errorEl = boxEl.querySelector('.quick-add-error');
 
-        function resetError() {
-            if (inputEl) inputEl.classList.remove('is-invalid');
-            if (errorEl) errorEl.textContent = '';
+        function clearError() {
+            inputEl.classList.remove('is-invalid');
+            errorEl.classList.add('d-none');
+            errorEl.classList.remove('d-block');
+            errorEl.textContent = '';
         }
 
-        function openModal(prefillName) {
-            if (!modalEl) return;
-            resetError();
-            if (inputEl) {
-                inputEl.value = prefillName || '';
+        function showError(msg) {
+            inputEl.classList.add('is-invalid');
+            errorEl.textContent = msg;
+            errorEl.classList.remove('d-none');
+            errorEl.classList.add('d-block');
+        }
+
+        function openBox(prefillValue) {
+            // Thu gọn khung thêm nhanh khác nếu đang mở
+            document.querySelectorAll('.quick-add-inline-box').forEach(function(other) {
+                if (other !== boxEl) other.classList.add('d-none');
+            });
+            clearError();
+            if (typeof prefillValue === 'string') {
+                inputEl.value = prefillValue;
             }
-            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            boxEl.classList.remove('d-none');
+            inputEl.focus();
+            inputEl.select();
         }
 
-        quickAddHandlers[cfg.selectId] = openModal;
-
-        if (modalEl) {
-            modalEl.addEventListener('shown.bs.modal', function() {
-                if (inputEl) {
-                    inputEl.focus();
-                    inputEl.select();
-                }
-            });
+        function closeBox() {
+            clearError();
+            boxEl.classList.add('d-none');
         }
 
-        if (openBtn) {
-            openBtn.addEventListener('click', function() {
-                openModal('');
-            });
-        }
+        function submitInline() {
+            clearError();
+            var value = inputEl.value.trim();
+            if (!value) {
+                showError(emptyError);
+                inputEl.focus();
+                return;
+            }
 
-        if (formEl) {
-            formEl.addEventListener('submit', function(e) {
-                e.preventDefault();
-                resetError();
+            var origHtml = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-                var value = inputEl ? inputEl.value.trim() : '';
-                if (!value) {
-                    inputEl.classList.add('is-invalid');
-                    errorEl.textContent = cfg.emptyMessage;
-                    return;
-                }
+            var payload = {};
+            payload[fieldName] = value;
 
-                var origBtnHtml = submitBtn.innerHTML;
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang lưu...';
-
-                var payload = {};
-                payload[cfg.fieldName] = value;
-
-                fetch(cfg.url, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                })
-                .then(function(res) {
-                    return res.json().then(function(data) {
-                        return { ok: res.ok, status: res.status, data: data };
-                    });
-                })
-                .then(function(result) {
-                    var addedItem = result.data && result.data.item;
-                    if (result.ok && result.data.status === 'success' && addedItem) {
-                        if (targetSelect && targetSelect._searchableSelect) {
-                            targetSelect._searchableSelect.addAndSelect(addedItem.id, addedItem.name);
-                        }
-                        formEl.reset();
-                        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-
-                        if (typeof Swal !== 'undefined') {
-                            Swal.fire({
-                                toast: true,
-                                position: 'top-end',
-                                icon: 'success',
-                                title: result.data.message || cfg.successFallback,
-                                showConfirmButton: false,
-                                timer: 2000
-                            });
-                        }
-                    } else {
-                        var fieldErrors = result.data && result.data.errors && result.data.errors[cfg.fieldName];
-                        var errMsg = (fieldErrors && fieldErrors[0])
-                            || (result.data && result.data.message)
-                            || cfg.errorFallback;
-                        inputEl.classList.add('is-invalid');
-                        errorEl.textContent = errMsg;
-                    }
-                })
-                .catch(function() {
-                    inputEl.classList.add('is-invalid');
-                    errorEl.textContent = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
-                })
-                .finally(function() {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = origBtnHtml;
+            fetch(storeUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(function(res) {
+                return res.json().then(function(data) {
+                    return { ok: res.ok, data: data };
                 });
+            })
+            .then(function(result) {
+                var addedItem = result.data && result.data.item;
+                if (result.ok && result.data.status === 'success' && addedItem) {
+                    if (targetSelect && targetSelect._searchableSelect) {
+                        targetSelect._searchableSelect.addAndSelect(addedItem.id, addedItem.name);
+                    }
+                    inputEl.value = '';
+                    closeBox();
+
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: result.data.message || 'Đã thêm mới thành công!',
+                            showConfirmButton: false,
+                            timer: 2000
+                        });
+                    }
+                } else {
+                    var fieldErrors = result.data && result.data.errors && result.data.errors[fieldName];
+                    var errMsg = (fieldErrors && fieldErrors[0])
+                        || (result.data && result.data.message)
+                        || 'Không thể lưu dữ liệu mới.';
+                    showError(errMsg);
+                }
+            })
+            .catch(function() {
+                showError('Lỗi kết nối máy chủ. Vui lòng thử lại.');
+            })
+            .finally(function() {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = origHtml;
+            });
+        }
+
+        quickAddHandlers[selectId] = { open: openBox, close: closeBox };
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                if (boxEl.classList.contains('d-none')) {
+                    openBox('');
+                } else {
+                    closeBox();
+                }
+            });
+        }
+
+        if (saveBtn) {
+            saveBtn.addEventListener('click', submitInline);
+        }
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', closeBox);
+        }
+
+        if (inputEl) {
+            inputEl.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    submitInline();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeBox();
+                }
             });
         }
     }
 
-    initQuickAddCategory({
-        modalId: 'modalAddType',
-        formId: 'formAddType',
-        inputId: 'newTypeNameInput',
-        errorId: 'newTypeNameError',
-        submitBtnId: 'btnSubmitAddType',
-        openBtnId: 'btnOpenAddTypeModal',
-        selectId: 'document_type_id',
-        fieldName: 'type_name',
-        url: '{{ route("categories.types.store") }}',
-        emptyMessage: 'Vui lòng nhập tên loại văn bản.',
-        successFallback: 'Đã thêm loại văn bản mới!',
-        errorFallback: 'Không thể thêm loại văn bản mới.'
-    });
-
-    initQuickAddCategory({
-        modalId: 'modalAddAuthority',
-        formId: 'formAddAuthority',
-        inputId: 'newAuthorityNameInput',
-        errorId: 'newAuthorityNameError',
-        submitBtnId: 'btnSubmitAddAuthority',
-        openBtnId: 'btnOpenAddAuthorityModal',
-        selectId: 'authority_id',
-        fieldName: 'authority_name',
-        url: '{{ route("categories.authorities.store") }}',
-        emptyMessage: 'Vui lòng nhập tên cơ quan ban hành.',
-        successFallback: 'Đã thêm cơ quan ban hành mới!',
-        errorFallback: 'Không thể thêm cơ quan ban hành mới.'
-    });
-
+    document.querySelectorAll('.quick-add-inline-box').forEach(initQuickAddInlineBox);
     document.querySelectorAll('select.searchable-select').forEach(makeSearchableSelect);
 
     // =========================================================================
-    // 2. TÌM KIẾM & CẢNH BÁO TRÙNG SỐ HIỆU VĂN BẢN KHI GÕ
+    // 3. TÌM KIẾM & CẢNH BÁO TRÙNG SỐ HIỆU VĂN BẢN KHI GÕ
     // =========================================================================
     var docInput = document.getElementById('document_number');
     var checkLoading = document.getElementById('checkDocLoading');
@@ -894,7 +955,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // =========================================================================
-    // 3. TỰ ĐỘNG ĐIỀN NGÀY CÓ HIỆU LỰC MẶC ĐỊNH = NGÀY BAN HÀNH
+    // 4. TỰ ĐỘNG ĐIỀN NGÀY CÓ HIỆU LỰC MẶC ĐỊNH = NGÀY BAN HÀNH
     // =========================================================================
     var issuedDateInput = document.getElementById('issued_date');
     var effectiveDateInput = document.getElementById('effective_date');
